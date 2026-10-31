@@ -27,6 +27,7 @@
   color-scheme:dark;
 }
 html,body{height:100%}
+@supports (height:100dvh){html,body{height:100dvh}}
 [hidden]{display:none!important}
 body{
   background:radial-gradient(120% 80% at 50% 0%,#1b2436 0%,var(--night) 60%);color:var(--ivory);font-family:var(--font);
@@ -207,6 +208,9 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
 #dpad .r{top:50%;right:3cqw;transform:translateY(-50%);border-left:5cqw solid #f6f1e7;border-right:0}
 #dpad.on-u .u,#dpad.on-d .d,#dpad.on-l .l,#dpad.on-r .r{opacity:1;filter:drop-shadow(0 0 1.4cqw #e0b35a)}
 #dpad b{position:absolute;left:50%;top:50%;width:9cqw;height:9cqw;margin:-4.5cqw 0 0 -4.5cqw;border-radius:50%;background:#f6f1e733;box-shadow:inset 0 0 0 .4cqw #f6f1e755;transition:transform .05s}
+#padBtn{position:absolute;right:calc(3cqw + env(safe-area-inset-right,0px));bottom:calc(35cqw + env(safe-area-inset-bottom,0px));z-index:5;
+  font:inherit;font-size:2.8cqw;font-weight:700;color:#f6f1e7;background:#0a0e16aa;border:0;border-radius:9cqw;padding:1cqw 2.6cqw;box-shadow:inset 0 0 0 .3cqw #ffffff30;touch-action:manipulation}
+#padBtn.off{bottom:calc(3cqw + env(safe-area-inset-bottom,0px));padding:1.6cqw 3cqw;font-size:3cqw}
 /* 테스트 패널 */
 .testbox{padding:2.6cqw 3cqw;border-radius:2cqw;background:#fff;box-shadow:inset 0 0 0 .3cqw var(--jade)}
 .testbox .label{color:var(--jade)}
@@ -227,6 +231,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
     <canvas id="game" aria-label="화살을 피하며 적진으로 진군하는 전장"></canvas>
     <div id="flash"></div>
 
+    <button id="padBtn" type="button" hidden>패드 숨기기</button>
     <div id="dpad" hidden><i class="u"></i><i class="r"></i><i class="d"></i><i class="l"></i><b></b></div>
     <div id="testTag">테스트 모드</div>
     <div id="hud" hidden>
@@ -607,8 +612,27 @@ function fit(){
   stage.style.width = w+'px'; stage.style.height = h+'px';
   const dpr = Math.min(2, window.devicePixelRatio||1);
   cvs.width = Math.round(w*dpr); cvs.height = Math.round(h*dpr);
+  requestAnimationFrame(() => fitCards());
 }
 addEventListener('resize', fit); fit();
+if(window.visualViewport) visualViewport.addEventListener('resize', fit);
+
+/* 안내·문제·결과 카드가 무대 안에 다 보이도록 글자와 간격을 함께 줄임 (최소 60%, 그보다 길면 스크롤) */
+function fitCards(){
+  document.querySelectorAll('.overlay:not([hidden]) > .card').forEach(card => {
+    const ov = card.parentElement, cs = getComputedStyle(ov);
+    const avail = ov.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    card.style.zoom = ''; card.style.maxHeight = 'none';
+    const z = Math.max(.6, Math.min(1, avail / card.scrollHeight));
+    if(z < .995) card.style.zoom = z;
+    card.style.maxHeight = (avail / (z < .995 ? z : 1)) + 'px';
+  });
+}
+let fitQueued = false;
+const queueFit = () => { if(fitQueued) return; fitQueued = true; requestAnimationFrame(() => { fitQueued = false; fitCards(); }); };
+new MutationObserver(queueFit).observe(stage, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['hidden']});
+addEventListener('resize', queueFit);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit);
 
 /* ---------- 소리 ----------
    SOUNDS 에 오디오 파일을 base64(data:audio/...;base64,...) 로 넣으면 그 소리를 쓰고,
@@ -909,9 +933,18 @@ function padAt(e){ const rc = pad.getBoundingClientRect(); padSet(e.clientX - rc
 pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); padId = e.pointerId; try{ pad.setPointerCapture(e.pointerId); }catch(_){} padAt(e); });
 pad.addEventListener('pointermove', e => { if(e.pointerId === padId) padAt(e); });
 ['pointerup','pointercancel','lostpointercapture'].forEach(t => pad.addEventListener(t, e => { if(e.pointerId === padId) padClear(); }));
-function syncPad(){
-  const on = IS_TOUCH && state === 'play';
-  if(pad.hidden === on){ pad.hidden = !on; if(!on) padClear(); }
+let padOff = store.get('cj-pad-off') === '1';
+const padBtn = $('padBtn');
+padBtn.addEventListener('pointerdown', e => e.stopPropagation());
+padBtn.onclick = () => { padOff = !padOff; store.set('cj-pad-off', padOff ? '1' : '0'); syncPad(true); };
+function syncPad(force){
+  const on = IS_TOUCH && state === 'play', show = on && !padOff;
+  if(pad.hidden === show || force){ pad.hidden = !show; if(!show) padClear(); }
+  if(padBtn.hidden === on || force){
+    padBtn.hidden = !on;
+    padBtn.textContent = padOff ? '방향 패드 보이기' : '패드 숨기기';
+    padBtn.classList.toggle('off', padOff);
+  }
 }
 
 const ROAD_L = 58, ROAD_R = W-58;
