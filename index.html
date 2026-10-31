@@ -185,6 +185,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
 .foot{position:sticky;bottom:0;margin:0 -5cqw;padding:2.6cqw 5cqw 3.6cqw;background:var(--ivory);box-shadow:0 -1px 0 var(--line);display:grid;gap:1.4cqw}
 .foot .keys,.foot .sndnote{text-align:center}
 .foot .keys:empty,.foot .sndnote:empty{display:none}
+.notehead{display:flex;align-items:baseline;justify-content:space-between;gap:2cqw}
 </style>
 </head>
 <body>
@@ -315,7 +316,8 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
         </dl>
         <p class="keys" id="sBest"></p>
         <div class="stack" style="gap:1.6cqw" id="notesWrap">
-          <span class="label">오답 노트</span>
+          <div class="notehead"><span class="label">오답 노트</span><span class="keys" id="reviewScore"></span></div>
+          <button class="btn ghost" id="reviewBtn" type="button">틀린 문제 다시 풀기</button>
           <div class="notes" id="notes"></div>
         </div>
         <div class="split">
@@ -408,7 +410,8 @@ const MAX_HP = 100;
 const FOE_HP = 5;           // 일반 적장 체력 (검기 1번 = 1)
 const BOSS_HP = 10;         // 장 끝 대장 체력
 const FINAL_BOSS_HP = 20;   // 마지막 대장(적국 성주) 체력
-const BOSS_Q = 2, FINAL_BOSS_Q = 3;   // 대장 / 최종 대장이 내는 문제 수
+const BOSS_Q = 2, FINAL_BOSS_Q = 3;
+const CHAPTER_HEAL = 30;    // 장 대장을 물리치면 회복하는 기력   // 대장 / 최종 대장이 내는 문제 수
 const FIRE_RATES = [.3, .24, .19, .15];  // 검기 간격(초): 速 0~3단계
 const TRAVEL_X = 1.5;
 const EASE_FROM = 10, EASE_X = .9;   // 第11陣(0부터 세어 10)부터 화살·적 공격을 10% 약하게       // 적장·보스를 만나러 가는 거리 배율 (1 = 원래 길이)
@@ -424,12 +427,12 @@ const CHAPTERS = [
     land:'river',
     arrowInt:1.05, arrowSpd:255, kinds:{normal:3,fire:2}, pats:{single:4,aimed:3,side:2,fan:2},
     homing:{max:2, every:5},
-    enemyInt:2.1, enemies:{foot:3,archer:2,cavalry:1}, scoreX:1.25, dmgX:1.2 },
+    enemyInt:2.1, enemies:{foot:3,archer:2,cavalry:1}, scoreX:1.25, dmgX:1.1 },
   { no:'三章', name:'적의 성채', boss:'적국 성주', news:'독화살 · 신기전 · 화살비',
     land:'wall',
     arrowInt:1.0, arrowSpd:280, kinds:{normal:2,fire:2,poison:2}, pats:{single:3,aimed:3,side:2,fan:2,volley:1,singi:2},
     homing:{max:3, every:4.5},
-    enemyInt:1.5, enemies:{foot:1,archer:6,cavalry:1}, scoreX:1.5, dmgX:1.4 },
+    enemyInt:1.5, enemies:{foot:1,archer:6,cavalry:1}, scoreX:1.5, dmgX:1.2 },
 ];
 /* 화살 종류 */
 const ARROWS = {
@@ -437,7 +440,7 @@ const ARROWS = {
   fire:  {dmg:12, spd:1.3,  fl:'#ff8a2a', tip:'#ffcf6a', glow:'#ff6a1a', name:'불화살'},
   poison:{dmg:5,  spd:1.05, fl:'#7cc943', tip:'#9be05a', poison:3, name:'독화살'},
   singi: {dmg:14, spd:1,    fl:'#d6a445', tip:'#ffcf6a', glow:'#ffb347', name:'신기전'},
-  homing:{dmg:9,  spd:1.15, fl:'#9b6ad6', tip:'#d4b8ff', glow:'#9b6ad6', turn:2.8, life:2, name:'유도화살'}  // life: 화면에 나온 뒤 따라오는 시간(초),
+  homing:{dmg:9,  spd:1.15, fl:'#9b6ad6', tip:'#d4b8ff', glow:'#9b6ad6', turn:2.4, life:2, lock:130, name:'유도화살'}  // life: 화면에 나온 뒤 따라오는 시간(초) · lock: 이 거리 안으로 들어오면 추적을 멈춤(옆으로 피할 수 있게),
 };
 /* 적병 종류 */
 const ENEMIES = {
@@ -666,6 +669,11 @@ addEventListener('keydown', e => {
       if(k==='h'||k==='H') useHint();
     } else if(k==='Enter'||k===' '){ e.preventDefault(); next(); }
   }
+  else if(state==='review'){
+    if(!rv.cur.done){ const n = parseInt(k,10); if(n>=1 && n<=4) reviewPick(n-1); }
+    else if(k==='Enter'||k===' '){ e.preventDefault(); reviewNext(); }
+  }
+  else if(state==='title' && k==='Enter' && document.activeElement===document.body) start();
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -730,6 +738,7 @@ function openQuiz(){
     g.enemies.forEach(en => burst(en.x,en.y,'#8a93a6',6)); g.enemies.length = 0;
   }
   state = 'quiz'; sfx.foe(); duckMusic(true);
+  $('qtimer').parentElement.hidden = false; $('hintBtn').parentElement.hidden = false;
 
   $('qcat').textContent = q.c;
   $('qstars').textContent = '★'.repeat(q.d) + '☆'.repeat(3-q.d);
@@ -822,6 +831,10 @@ function next(){
     if(e.hits>0){ g.kills++; burst(g.foe.x,g.foe.y,'#e2553a',40); floatText(g.foe.x,g.foe.y-30,'擊破!','#ffd27a',40); g.shake = reduceMotion?2:8; sfx.kill(); }
     else floatText(g.foe.x,g.foe.y-30,'적장 후퇴','#c9ccd1',26);
   }
+  if(e.boss && g.encIdx < g.enc.length-1){
+    const n = Math.min(CHAPTER_HEAL, MAX_HP - g.hp); g.hp += n; g.poison = 0;
+    floatText(g.player.x, g.player.y-60, `승전 보상 · 기력 +${Math.round(n)}`, '#9be07a', 22);
+  }
   g.foe = null; g.qi = 0; g.encIdx++;
   duckMusic(false);
   if(g.encIdx >= g.enc.length) return endGame(true);
@@ -831,7 +844,56 @@ function next(){
   playBgm(CHAPTER_BGM[g.ch]);
   g.invuln = 1.2; state = 'play';
 }
-$('nextBtn').onclick = next;
+$('nextBtn').onclick = () => state==='review' ? reviewNext() : next();
+
+/* ---------- 오답 다시 풀기 (기력·점수와 무관한 복습) ---------- */
+let rv = null;
+function startReview(){
+  if(!g || !g.wrong.length) return;
+  rv = {list:g.wrong.map(w => w.q), i:0, right:0};
+  show('overScreen', false); state = 'review'; showReview();
+}
+function showReview(){
+  const q = rv.list[rv.i], opts = shuffle(q.o.slice());
+  rv.cur = {q, opts, ans:opts.indexOf(q.o[0]), done:false};
+  $('qcat').textContent = q.c;
+  $('qstars').textContent = '★'.repeat(q.d) + '☆'.repeat(3-q.d);
+  $('qstakes').textContent = `오답 복습 ${rv.i+1} / ${rv.list.length}`;
+  $('qfoe').textContent = '시간 제한도, 기력 감소도 없어요. 천천히 다시 풀어 보세요.';
+  $('qtimer').parentElement.hidden = true; $('hintBtn').parentElement.hidden = true;
+  $('qtext').textContent = q.q;
+  const hz = $('qhanja'); hz.hidden = !q.h; hz.textContent = q.h||''; hz.classList.toggle('long', !!q.h && q.h.length > 5);
+  const box = $('qchoices'); box.innerHTML = '';
+  opts.forEach((o,i) => {
+    const bt = document.createElement('button'); bt.type = 'button'; bt.id = 'opt-'+i;
+    bt.innerHTML = `<span>${'①②③④'[i]}</span>`; bt.appendChild(document.createTextNode(o));
+    bt.onclick = () => reviewPick(i); box.appendChild(bt);
+  });
+  $('qfb').hidden = true;
+  show('quiz', true); $('qcard').scrollTop = 0;
+}
+function reviewPick(i){
+  const c = rv.cur; if(c.done) return;
+  c.done = true;
+  const ok = i === c.ans; if(ok) rv.right++;
+  [...$('qchoices').children].forEach((b,j) => { b.disabled = true; if(j===c.ans) b.classList.add('right'); else if(j===i) b.classList.add('wrong'); });
+  $('qres').textContent = ok ? '맞혔어요!' : '아직 헷갈려요'; $('qres').className = ok ? 'ok' : 'no';
+  $('qdetail').textContent = `정답: ${c.opts[c.ans]}`;
+  $('qexp').textContent = c.q.e || '';
+  (ok ? sfx.good : sfx.bad)();
+  $('nextBtn').textContent = rv.i+1 < rv.list.length ? '다음 문제' : '결과로 돌아가기';
+  $('qfb').hidden = false; $('nextBtn').focus({preventScroll:true}); $('qfb').scrollIntoView({block:'nearest'});
+}
+function reviewNext(){
+  if(!rv.cur.done) return;
+  rv.i++;
+  if(rv.i < rv.list.length) return showReview();
+  show('quiz', false); state = 'over';
+  $('reviewScore').textContent = `다시 풀기 ${rv.right} / ${rv.list.length} 정답`;
+  $('reviewBtn').textContent = '한 번 더 풀기';
+  show('overScreen', true);
+}
+$('reviewBtn').onclick = startReview;
 
 /* ---------- 피해 · 효과 ---------- */
 function hurt(n, big){
@@ -867,6 +929,7 @@ function endGame(won){
   else $('sBest').textContent = `최고 점수 ${best.toLocaleString()}점`;
   const notes = $('notes'); notes.innerHTML = '';
   $('notesWrap').hidden = !g.wrong.length;
+  $('reviewScore').textContent = ''; $('reviewBtn').textContent = '틀린 문제 다시 풀기';
   g.wrong.forEach(w => {
     const d = document.createElement('div'); d.className = 'note';
     const add = (cls, txt) => { const s=document.createElement('span'); s.className=cls; s.textContent=txt; d.appendChild(s); };
@@ -1028,7 +1091,7 @@ function update(dt){
       a.vy += 260*dt; a.y += a.vy*dt;
       a.x = a.bx + Math.sin(a.t*7)*24; a.vx = Math.cos(a.t*7)*24*7;
       if(Math.random() < .6) g.parts.push({type:'dot',x:a.x-a.vx/Math.hypot(a.vx,a.vy)*30,y:a.y-a.vy/Math.hypot(a.vx,a.vy)*30,vx:rand(-10,10),vy:rand(-10,10),life:.35,max:.35,col:'#9a948a'});
-    } else if(a.kind==='homing' && (a.seen = (a.seen||0) + (a.y > 0 ? dt : 0)) < ARROWS.homing.life){
+    } else if(a.kind==='homing' && !a.locked && (a.seen = (a.seen||0) + (a.y > 0 ? dt : 0)) < ARROWS.homing.life && !(a.locked = Math.hypot(p.x-a.x, p.y-a.y) < ARROWS.homing.lock)){
       const sp = Math.hypot(a.vx,a.vy), cur = Math.atan2(a.vy,a.vx);
       let diff = Math.atan2(p.y-a.y, p.x-a.x) - cur;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
