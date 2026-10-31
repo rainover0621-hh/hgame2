@@ -408,6 +408,7 @@ const MAX_HP = 100;
 const FOE_HP = 5;           // 일반 적장 체력 (검기 1번 = 1)
 const BOSS_HP = 10;         // 장 끝 대장 체력
 const FINAL_BOSS_HP = 20;   // 마지막 대장(적국 성주) 체력
+const BOSS_Q = 2, FINAL_BOSS_Q = 3;   // 대장 / 최종 대장이 내는 문제 수
 const FIRE_RATES = [.3, .24, .19, .15];  // 검기 간격(초): 速 0~3단계
 const TRAVEL_X = 1.5;
 const EASE_FROM = 10, EASE_X = .9;   // 第11陣(0부터 세어 10)부터 화살·적 공격을 10% 약하게       // 적장·보스를 만나러 가는 거리 배율 (1 = 원래 길이)
@@ -416,19 +417,19 @@ const EASE_FROM = 10, EASE_X = .9;   // 第11陣(0부터 세어 10)부터 화살
 const CHAPTERS = [
   { no:'一章', name:'국경 산길', boss:'국경 수비대장', news:'화살 · 겨냥 화살 · 유도화살 · 보병 · 궁병',
     land:'pine',
-    arrowInt:1.0, arrowSpd:220, kinds:{normal:1}, pats:{single:6,aimed:3},
+    arrowInt:1.3, arrowSpd:220, kinds:{normal:1}, pats:{single:6,aimed:3},
     homing:{max:1, every:7},      // 유도화살: 화면에 동시에 최대 max개, 약 every초마다 1발
     enemyInt:2.8, enemies:{foot:3,archer:1}, scoreX:1, dmgX:1 },
   { no:'二章', name:'강가 진지', boss:'기병대장', news:'불화살 · 부채꼴 연사 · 측면 화살 · 기병',
     land:'river',
-    arrowInt:.78, arrowSpd:255, kinds:{normal:3,fire:2}, pats:{single:4,aimed:3,side:2,fan:2},
+    arrowInt:1.05, arrowSpd:255, kinds:{normal:3,fire:2}, pats:{single:4,aimed:3,side:2,fan:2},
     homing:{max:2, every:5},
     enemyInt:2.1, enemies:{foot:3,archer:2,cavalry:1}, scoreX:1.25, dmgX:1.2 },
   { no:'三章', name:'적의 성채', boss:'적국 성주', news:'독화살 · 신기전 · 화살비',
     land:'wall',
-    arrowInt:.62, arrowSpd:290, kinds:{normal:2,fire:2,poison:2}, pats:{single:3,aimed:3,side:2,fan:2,volley:1,singi:2},
-    homing:{max:3, every:3.5},
-    enemyInt:1.6, enemies:{foot:2,archer:3,cavalry:2}, scoreX:1.5, dmgX:1.4 },
+    arrowInt:1.0, arrowSpd:280, kinds:{normal:2,fire:2,poison:2}, pats:{single:3,aimed:3,side:2,fan:2,volley:1,singi:2},
+    homing:{max:3, every:4.5},
+    enemyInt:1.5, enemies:{foot:1,archer:6,cavalry:1}, scoreX:1.5, dmgX:1.4 },
 ];
 /* 화살 종류 */
 const ARROWS = {
@@ -622,13 +623,14 @@ const keys = {};
 function buildEncounters(){
   const pool = QUESTIONS.filter(q => selCats.has(q.c));
   // 쉬운 문제가 앞쪽에 오도록 살짝 정렬하되 매번 순서는 바뀜
-  const qs = shuffle(pool.slice()).map(q=>({q,k:q.d+Math.random()*1.6})).sort((a,b)=>a.k-b.k).map(x=>x.q).slice(0, GATES_PER_RUN+3);
+  const qs = shuffle(pool.slice()).map(q=>({q,k:q.d+Math.random()*1.6})).sort((a,b)=>a.k-b.k).map(x=>x.q).slice(0, GATES_PER_RUN + 2*(BOSS_Q-1) + (FINAL_BOSS_Q-1));
   const G = Math.min(GATES_PER_RUN, qs.length), gpc = Math.max(1, Math.ceil(G/3));
   let extra = qs.length - G, k = 0;
   const list = [];
   for(let i=0;i<G;i++){
     const boss = i%gpc===gpc-1 || i===G-1;
-    const n = boss && extra>0 ? (extra--, 2) : 1;
+    let n = 1;
+    if(boss){ const add = Math.min(extra, (i===G-1 ? FINAL_BOSS_Q : BOSS_Q) - 1); n += add; extra -= add; }
     list.push({boss, ch:Math.min(2, Math.floor(i/gpc)), qs:qs.slice(k, k+=n), hits:0});
   }
   return {list, gpc};
@@ -978,7 +980,7 @@ function update(dt){
         f.shotT -= dt;
         if(f.shotT <= 0){
           f.shotT = (f.boss ? 1.7 - g.ch*.3 : 1.9 - g.ch*.25) / ease() * rand(.85,1.15);
-          const kind = weighted(c.kinds), s = c.arrowSpd*.95*ARROWS[kind].spd*ease(), n = f.boss ? 3 + g.ch*2 : 1 + g.ch;
+          const kind = weighted(c.kinds), s = c.arrowSpd*.95*ARROWS[kind].spd*ease(), n = f.boss ? 3 + g.ch : 1 + Math.min(g.ch,1);
           const base = Math.atan2(p.y-f.y, p.x-f.x);
           for(let i=0;i<n;i++){ const a = base + (i-(n-1)/2)*.2; addArrow(f.x+Math.cos(a)*30, f.y+Math.sin(a)*30, Math.cos(a)*s, Math.sin(a)*s, kind); }
         }
@@ -1102,7 +1104,7 @@ function spawnPattern(c){
   else if(pat==='aimed'){ const d = Math.hypot(p.x-x, p.y+40)||1; addArrow(x, -40, (p.x-x)/d*s, (p.y+40)/d*s, kind); }
   else if(pat==='side'){ g.warns.push({side:Math.random()<.5?-1:1, y:clamp(p.y+rand(-90,90), H*.42, H-50), t:.9, kind}); sfx.warn(); }
   else if(pat==='fan'){
-    const ox = rand(ROAD_L+30, ROAD_R-30), base = Math.atan2(p.y+30, p.x-ox), n = g.ch>=2 ? 5 : 3;
+    const ox = rand(ROAD_L+30, ROAD_R-30), base = Math.atan2(p.y+30, p.x-ox), n = g.ch>=2 ? 4 : 3;
     for(let i=0;i<n;i++){ const a = base + (i-(n-1)/2)*.22; addArrow(ox, -30, Math.cos(a)*s*.9, Math.sin(a)*s*.9, kind); }
   }
   else if(pat==='volley'){ if(!g.volley){ g.volley = {t:1, gap:rand(ROAD_L+50, ROAD_R-50)}; sfx.warn(); } }
@@ -1598,5 +1600,6 @@ function frame(t){
 if(document.fonts && document.fonts.load) document.fonts.load(`900 20px "Noto Sans KR"`, '第陣章敵擊破藥蔘盾書劍鼓速국경산길강가진지적의성채').catch(()=>{});
 requestAnimationFrame(frame);
 </script>
+
 </body>
 </html>
