@@ -25,7 +25,7 @@
 2. 만들어진 QR을 화면에 띄우거나 **QR 안내문 인쇄**로 나눠 줍니다.
 3. 학생 화면에서는 단원을 바꿀 수 없고, 학년·반·번호·이름을 적어야 출정할 수 있습니다.
 
-1~8과 전체로 출제하는 기본 주소의 QR: [docs/게임QR.png](docs/게임QR.png)
+1~8과 전체로 출제하는 기본 주소의 QR: [docs/게임QR.png](docs/게임QR.png) · 인쇄용 안내문: [docs/게임QR-안내문.png](docs/게임QR-안내문.png)
 
 <img src="docs/게임QR.png" width="200" alt="한문 출정기 QR">
 
