@@ -243,6 +243,9 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
 .mine{display:grid;gap:.8cqw;font-size:3cqw}
 .mine div{display:flex;gap:2cqw;justify-content:space-between;border-bottom:1px dashed var(--line);padding-block:.6cqw;font-variant-numeric:tabular-nums}
 .mine .none{color:var(--ink-soft);border:0}
+.wholine{font-size:3.2cqw;font-weight:700}
+.mypos{font-size:3.6cqw;font-weight:700;background:#fff7e3;border-radius:2cqw;padding:2cqw 3cqw;box-shadow:inset 0 0 0 .4cqw var(--gold);margin:0}
+.mypos b{color:var(--vermilion);font-size:4.6cqw}
 /* 테스트 패널 */
 .testbox{padding:2.6cqw 3cqw;border-radius:2cqw;background:#fff;box-shadow:inset 0 0 0 .3cqw var(--jade)}
 .testbox .label{color:var(--jade)}
@@ -354,7 +357,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
             <button class="btn" id="startBtn" type="button">출정하기</button>
             <button class="btn ghost" id="soundBtn" type="button" aria-pressed="true">소리 켬</button>
           </div>
-          <div class="footline"><p class="keys" id="bestLine"></p><button class="linkbtn" id="rankBtnT" type="button">오늘의 순위 · 내 기록</button></div>
+          <div class="footline"><p class="keys" id="bestLine"></p><button class="linkbtn" id="rankBtnT" type="button">나의 기록 · 우리 반 순위</button></div>
         </footer>
       </div>
     </div>
@@ -397,15 +400,29 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
     <!-- 오늘의 순위 -->
     <div class="overlay" id="rankScreen" hidden>
       <div class="card stack">
-        <div class="rankhead"><h2>오늘의 순위</h2><span class="keys" id="rankDate"></span></div>
-        <div class="cats" role="group" aria-label="순위 범위">
-          <button type="button" id="rkAll" aria-pressed="true">전체</button>
-          <button type="button" id="rkClass" aria-pressed="false">우리 반</button>
+        <div class="rankhead"><h2 id="rankTitle">나의 기록</h2><span class="keys" id="rankDate"></span></div>
+        <div class="cats" role="group" aria-label="보기">
+          <button type="button" id="rkMine" aria-pressed="true">나의 기록</button>
+          <button type="button" id="rkClass" aria-pressed="false">우리 반 순위</button>
+        </div>
+        <p class="wholine" id="rankWho"></p>
+        <div class="stack" id="mineBox" style="gap:2cqw">
+          <dl class="stats" style="margin:0">
+            <div><dt>오늘 최고 점수</dt><dd id="mBest">-</dd></div>
+            <div><dt>오늘 출정</dt><dd id="mPlays">0번</dd></div>
+            <div><dt>오늘 완주</dt><dd id="mDone">0번</dd></div>
+            <div><dt>우리 반 순위</dt><dd id="mRank">-</dd></div>
+          </dl>
+          <span class="label">오늘 출정 기록</span>
+          <div class="mine" id="myList"></div>
+          <span class="label">지난 기록 (이 기기)</span>
+          <div class="mine" id="myPast"></div>
+        </div>
+        <div class="stack" id="classBox" style="gap:2cqw" hidden>
+          <p class="mypos" id="myPos"></p>
+          <ol class="ranks" id="rankList"></ol>
         </div>
         <p class="keys" id="rankStatus"></p>
-        <ol class="ranks" id="rankList"></ol>
-        <span class="label">이 기기에서 오늘 한 기록</span>
-        <div class="mine" id="myList"></div>
         <div class="split">
           <button class="btn ghost" id="rankRefresh" type="button">새로고침</button>
           <button class="btn" id="rankClose" type="button">닫기</button>
@@ -437,7 +454,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
           <button class="btn" id="againBtn" type="button">다시 출정</button>
           <button class="btn ghost" id="homeBtn" type="button">처음으로</button>
         </div>
-        <button class="btn ghost" id="rankBtnO" type="button">오늘의 순위 보기</button>
+        <button class="btn ghost" id="rankBtnO" type="button">나의 기록 · 우리 반 순위</button>
       </div>
     </div>
   </div>
@@ -1034,25 +1051,34 @@ function saveLocal(won, title){
     grade:s.grade, cls:s.cls, num:s.num, name:s.name, score:g.score, result:title, done:won?1:0, correct:g.correct, answered:g.answered});
   store.set('cj-history', JSON.stringify(list.slice(-80)));
 }
-let rankMode = 'all', rankData = null, rankFrom = null;
+let rankMode = 'mine', rankData = null, rankFrom = null, rankSrc = 'local';
+const isMe = (r, s) => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && r.name === maskName(s.name);
+const myLocal = s => loadLocal().filter(r => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && r.name === s.name);
 function openRank(){
   rankFrom = !$('overScreen').hidden ? 'overScreen' : 'titleScreen';
   show(rankFrom, false); show('rankScreen', true);
   const d = new Date(); $('rankDate').textContent = `${d.getMonth()+1}월 ${d.getDate()}일`;
-  renderMine(); loadRank();
+  const s = student();
+  $('rankWho').textContent = s.name ? `${s.grade}학년 ${s.cls||'?'}반 ${s.num||'?'}번 ${s.name}` : '첫 화면에 학년 · 반 · 번호 · 이름을 적으면 내 기록을 볼 수 있어요.';
+  renderRank(); loadRank();
   $('rankClose').focus({preventScroll:true});
 }
 function closeRank(){ show('rankScreen', false); show(rankFrom || 'titleScreen', true); }
-function renderMine(){
-  const mine = loadLocal().filter(r => r.d === todayStr()).reverse();
-  $('myList').innerHTML = '';
-  if(!mine.length){ $('myList').innerHTML = '<div class="none">오늘은 아직 출정 기록이 없어요.</div>'; return; }
-  mine.forEach(r => {
-    const row = document.createElement('div');
-    row.textContent = `${r.t} · ${r.result} · ${r.correct}/${r.answered} 정답`;
-    const b = document.createElement('b'); b.textContent = `${Number(r.score).toLocaleString()}점`;
-    row.appendChild(b); $('myList').appendChild(row);
-  });
+function playRow(r, withDate){
+  const row = document.createElement('div');
+  row.textContent = `${withDate ? r.d.slice(5).replace('-','/')+' ' : ''}${r.t} · ${r.result} · ${r.correct}/${r.answered} 정답`;
+  const b = document.createElement('b'); b.textContent = `${Number(r.score).toLocaleString()}점`;
+  row.appendChild(b); return row;
+}
+function classRows(){
+  const s = student();
+  return (rankData || []).filter(r => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls));
+}
+function myClassRank(){
+  const s = student(), rows = classRows();
+  const i = rows.findIndex(r => isMe(r, s));
+  if(i < 0) return null;
+  return {rank: rows.filter(r => r.score > rows[i].score).length + 1, total: rows.length, score: rows[i].score};
 }
 function localRank(){
   const best = {};
@@ -1065,51 +1091,62 @@ function localRank(){
   return Object.values(best).sort((a,b) => b.score - a.score);
 }
 function loadRank(){
-  rankData = null;
   if(!RECORD_URL){
-    rankData = localRank();
-    $('rankStatus').textContent = '선생님 기록 시트가 아직 연결되지 않아, 이 기기에서 한 기록으로 순위를 보여 줘요.';
+    rankData = localRank(); rankSrc = 'local';
+    $('rankStatus').textContent = '선생님 기록 시트가 아직 연결되지 않아, 우리 반 순위는 이 기기에서 한 기록으로만 보여 줘요.';
     return renderRank();
   }
-  $('rankStatus').textContent = '선생님 기록 시트에서 오늘 순위를 불러오는 중…';
-  $('rankList').innerHTML = '';
+  $('rankStatus').textContent = '선생님 기록 시트에서 오늘 기록을 불러오는 중…';
   const ctl = 'AbortController' in window ? new AbortController() : null;
   const timer = setTimeout(() => ctl && ctl.abort(), 9000);
   fetch(`${RECORD_URL}?action=rank&t=${Date.now()}`, ctl ? {signal:ctl.signal} : {})
     .then(r => r.json())
     .then(j => {
-      rankData = Array.isArray(j.players) ? j.players : [];
+      rankData = Array.isArray(j.players) ? j.players : []; rankSrc = 'server';
       const d = new Date();
-      $('rankStatus').textContent = `오늘 ${j.plays||0}번 출정 · ${rankData.length}명 · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 기준`;
+      $('rankStatus').textContent = `선생님 기록 시트 · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 기준`;
       renderRank();
     })
     .catch(() => {
-      rankData = localRank();
-      $('rankStatus').textContent = '순위를 불러오지 못했어요. 인터넷을 확인해 주세요. 지금은 이 기기 기록만 보여요.';
+      rankData = localRank(); rankSrc = 'local';
+      $('rankStatus').textContent = '기록을 불러오지 못했어요. 인터넷을 확인해 주세요. 지금은 이 기기 기록만 보여요.';
       renderRank();
     })
     .finally(() => clearTimeout(timer));
 }
 function renderRank(){
-  const s = student(), list = $('rankList');
-  $('rkAll').setAttribute('aria-pressed', rankMode === 'all'); $('rkClass').setAttribute('aria-pressed', rankMode === 'class');
-  let rows = rankData || [];
-  if(rankMode === 'class') rows = rows.filter(r => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls));
+  const s = student();
+  $('rkMine').setAttribute('aria-pressed', rankMode === 'mine'); $('rkClass').setAttribute('aria-pressed', rankMode === 'class');
+  $('rankTitle').textContent = rankMode === 'mine' ? '나의 기록' : '우리 반 순위';
+  $('mineBox').hidden = rankMode !== 'mine'; $('classBox').hidden = rankMode !== 'class';
+  // 나의 기록
+  const mine = myLocal(s), today = mine.filter(r => r.d === todayStr()).reverse(), past = mine.filter(r => r.d !== todayStr()).reverse().slice(0, 10);
+  $('mBest').textContent = today.length ? Math.max(...today.map(r => r.score)).toLocaleString() : '-';
+  $('mPlays').textContent = `${today.length}번`;
+  $('mDone').textContent = `${today.filter(r => r.done).length}번`;
+  const mr = rankData ? myClassRank() : null;
+  $('mRank').textContent = mr ? `${mr.rank}등 / ${mr.total}명` : '-';
+  $('myList').innerHTML = ''; $('myPast').innerHTML = '';
+  if(!today.length) $('myList').innerHTML = '<div class="none">오늘은 아직 출정 기록이 없어요.</div>';
+  today.forEach(r => $('myList').appendChild(playRow(r, false)));
+  if(!past.length) $('myPast').innerHTML = '<div class="none">지난 기록이 없어요.</div>';
+  past.forEach(r => $('myPast').appendChild(playRow(r, true)));
+  // 우리 반 순위
+  const list = $('rankList'), rows = classRows();
   list.innerHTML = '';
-  if(!rows.length){
-    const li = document.createElement('li'); li.className = 'empty';
-    li.textContent = rankMode === 'class' && !s.cls ? '첫 화면에 반을 적으면 우리 반 순위를 볼 수 있어요.' : '아직 오늘 기록이 없어요.';
-    list.appendChild(li); return;
-  }
-  const myName = maskName(s.name);
+  if(!s.cls){ $('myPos').textContent = '첫 화면에 반을 적으면 우리 반 순위를 볼 수 있어요.'; return; }
+  $('myPos').innerHTML = '';
+  if(mr){ $('myPos').append(`${s.grade}학년 ${s.cls}반 ${mr.total}명 중 나는 `); const b = document.createElement('b'); b.textContent = `${mr.rank}등`; $('myPos').append(b, ` · 최고 ${mr.score.toLocaleString()}점`); }
+  else $('myPos').textContent = rankData ? `${s.grade}학년 ${s.cls}반 오늘 기록 ${rows.length}명 · 나는 아직 오늘 기록이 없어요.` : '불러오는 중…';
+  if(!rows.length){ const li = document.createElement('li'); li.className = 'empty'; li.textContent = '우리 반의 오늘 기록이 아직 없어요.'; list.appendChild(li); return; }
   let rank = 0, prev = null;
-  rows.slice(0, 50).forEach((r, i) => {
+  rows.forEach((r, i) => {
     if(r.score !== prev){ rank = i + 1; prev = r.score; }
     const li = document.createElement('li');
-    if(String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && r.name === myName) li.className = 'me';
+    if(isMe(r, s)) li.className = 'me';
     const rk = document.createElement('span'); rk.className = 'rk' + (rank <= 3 ? ' r'+rank : ''); rk.textContent = rank;
     const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name || '이름 없음';
-    const sub = document.createElement('small'); sub.textContent = `${r.grade}학년 ${r.cls}반 ${r.num}번 · ${r.plays||1}번 출정`; nm.appendChild(sub);
+    const sub = document.createElement('small'); sub.textContent = `${r.num}번 · ${r.plays||1}번 출정`; nm.appendChild(sub);
     const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = Number(r.score).toLocaleString();
     const rs = document.createElement('small'); rs.textContent = r.result || ''; sc.appendChild(rs);
     li.append(rk, nm, sc); list.appendChild(li);
@@ -1118,8 +1155,8 @@ function renderRank(){
 $('rankBtnT').onclick = openRank;
 $('rankBtnO').onclick = openRank;
 $('rankClose').onclick = closeRank;
-$('rankRefresh').onclick = () => { renderMine(); loadRank(); };
-$('rkAll').onclick = () => { rankMode = 'all'; renderRank(); };
+$('rankRefresh').onclick = loadRank;
+$('rkMine').onclick = () => { rankMode = 'mine'; renderRank(); };
 $('rkClass').onclick = () => { rankMode = 'class'; renderRank(); };
 
 /* ---------- 게임 상태 ---------- */
