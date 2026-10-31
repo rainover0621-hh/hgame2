@@ -430,14 +430,14 @@ const DIFF = {1:{score:100,dmg:15,time:15},2:{score:200,dmg:23,time:18},3:{score
 const CATS = ['한자','한자어휘','한자성어','고사성어','문장풀이','기타'];
 const GATES_PER_RUN = 15;   // 적장(陣) 수. 장마다 마지막 陣은 두 문제를 내는 대장
 const MAX_HP = 100;
-const FOE_HP = 5;           // 일반 적장 체력 (검기 1번 = 1)
+const FOE_HP = 10;          // 일반 적장 체력 (검기 1번 = 1)
 const BOSS_HP = 10;         // 장 끝 대장 체력
 const FINAL_BOSS_HP = 20;   // 마지막 대장(적국 성주) 체력
 const BOSS_Q = 2, FINAL_BOSS_Q = 3;   // 대장 / 최종 대장이 내는 문제 수
 const CHAPTER_HEAL = 15;    // 장 대장 문제를 하나 맞힐 때마다 받는 승전 보상 기력
 const FIRE_RATES = [.3, .24, .19, .15];  // 검기 간격(초): 速 0~3단계
 const TRAVEL_X = 1.5;
-const HARD = 1.1;           // 전체 난이도 배율: 화살·적이 나오는 빈도와 오답 피해 (1 = 기본, 1.1 = 10% 어렵게)
+const HARD = 1.2;           // 전체 난이도 배율: 화살·적이 나오는 빈도와 오답 피해 (1 = 기본, 1.2 = 20% 어렵게)
 const EASE_FROM = 10, EASE_X = .9;   // 第11陣(0부터 세어 10)부터 화살·적 공격을 10% 약하게       // 적장·보스를 만나러 가는 거리 배율 (1 = 원래 길이)
 
 /* 장(章)별 전장 설정 — 뒤로 갈수록 화살 종류가 늘고 빨라짐 */
