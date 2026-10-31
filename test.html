@@ -186,6 +186,15 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
 .foot .keys,.foot .sndnote{text-align:center}
 .foot .keys:empty,.foot .sndnote:empty{display:none}
 .notehead{display:flex;align-items:baseline;justify-content:space-between;gap:2cqw}
+/* 학생 정보 */
+.who{display:grid;grid-template-columns:1.15fr 1fr 1fr 1.6fr;gap:1.4cqw}
+.who label{display:flex;align-items:center;gap:1cqw;white-space:nowrap;background:#fff;border-radius:2cqw;padding:0 2cqw;box-shadow:inset 0 0 0 .25cqw var(--line);font-size:3cqw;font-weight:700;color:var(--ink-soft);min-width:0}
+.who label:focus-within{box-shadow:inset 0 0 0 .4cqw var(--ink)}
+.who input,.who select{font:inherit;font-size:3.6cqw;font-weight:700;color:var(--ink);border:0;background:transparent;width:100%;min-width:0;padding:1.8cqw 0;outline:none;-moz-appearance:textfield}
+.who select{width:auto;flex:1}
+.who input::-webkit-outer-spin-button,.who input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.whomsg{font-size:2.9cqw;font-weight:700;color:var(--vermilion)}
+.sendline{font-size:2.9cqw;color:var(--ink-soft)}
 /* 테스트 패널 */
 .testbox{padding:2.6cqw 3cqw;border-radius:2cqw;background:#fff;box-shadow:inset 0 0 0 .3cqw var(--jade)}
 .testbox .label{color:var(--jade)}
@@ -244,6 +253,17 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
             <span>三章</span><button type="button" id="t-2-0">적의 성채</button><button type="button" id="t-2-1">적국 성주</button>
           </div>
           <label class="god"><input type="checkbox" id="godMode"> 무적 (기력이 줄지 않음)</label>
+        </section>
+
+        <section>
+          <span class="label">학생 정보</span>
+          <div class="who">
+            <label><select id="stGrade"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>학년</label>
+            <label><input id="stClass" type="number" min="1" max="20" inputmode="numeric" placeholder="0">반</label>
+            <label><input id="stNum" type="number" min="1" max="50" inputmode="numeric" placeholder="0">번</label>
+            <label class="nm"><input id="stName" type="text" maxlength="12" autocomplete="off" placeholder="이름"></label>
+          </div>
+          <p class="whomsg" id="whoMsg" hidden></p>
         </section>
 
         <section>
@@ -338,6 +358,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
           <div><dt>물리친 적</dt><dd id="sKills">0</dd></div>
         </dl>
         <p class="keys" id="sBest"></p>
+        <p class="sendline" id="sendLine" hidden></p>
         <div class="stack" style="gap:1.6cqw" id="notesWrap">
           <div class="notehead"><span class="label">오답 노트</span><span class="keys" id="reviewScore"></span></div>
           <button class="btn ghost" id="reviewBtn" type="button">틀린 문제 다시 풀기</button>
@@ -642,6 +663,60 @@ function showBest(){
 }
 showBest();
 
+/* ---------- 학생 정보 · 기록 전송 ----------
+   RECORD_URL 에 선생님의 Apps Script 웹 앱 주소(…/exec)를 넣으면,
+   게임이 끝날 때마다 결과가 선생님의 구글 시트에 한 줄씩 쌓입니다. 비워 두면 보내지 않습니다. */
+const RECORD_URL = '';   // 테스트 페이지는 기록을 보내지 않음
+const student = () => ({grade:$('stGrade').value, cls:$('stClass').value.trim(), num:$('stNum').value.trim(), name:$('stName').value.trim()});
+try{
+  const s0 = JSON.parse(store.get('cj-student')||'null');
+  if(s0){ $('stGrade').value = s0.grade||'1'; $('stClass').value = s0.cls||''; $('stNum').value = s0.num||''; $('stName').value = s0.name||''; }
+}catch(e){}
+['stGrade','stClass','stNum','stName'].forEach(id => $(id).addEventListener('input', () => { $('whoMsg').hidden = true; store.set('cj-student', JSON.stringify(student())); }));
+function checkStudent(){
+  const s = student();
+  if(!RECORD_URL || (s.cls && s.num && s.name)) return true;
+  $('whoMsg').textContent = '기록을 남기려면 반, 번호, 이름을 모두 적어 주세요.';
+  $('whoMsg').hidden = false;
+  $(!s.cls ? 'stClass' : !s.num ? 'stNum' : 'stName').focus();
+  $('titleScreen').querySelector('.card').scrollTop = 0;
+  return false;
+}
+function postRecord(rec){
+  return fetch(RECORD_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(rec)});
+}
+function flushPending(){
+  if(!RECORD_URL) return;
+  let list = [];
+  try{ list = JSON.parse(store.get('cj-pending')||'[]'); }catch(e){}
+  if(!list.length) return;
+  store.set('cj-pending', '[]');
+  list.forEach(rec => postRecord(rec).catch(() => queueRecord(rec)));
+}
+function queueRecord(rec){
+  let list = [];
+  try{ list = JSON.parse(store.get('cj-pending')||'[]'); }catch(e){}
+  list.push(rec); store.set('cj-pending', JSON.stringify(list.slice(-30)));
+}
+function submitRecord(won, title){
+  const line = $('sendLine'), s = student();
+  if(!RECORD_URL){ line.hidden = true; return; }
+  const rec = {
+    grade:s.grade, cls:s.cls, num:s.num, name:s.name,
+    result:title, done:won ? 1 : 0, score:g.score, correct:g.correct, answered:g.answered,
+    reached:`${CH().no} 第${Math.min(g.encIdx+1, g.enc.length)}陣`, kills:g.kills, maxCombo:g.maxCombo,
+    cats:[...selCats].join(', '), seconds:Math.round((performance.now()-g.t0)/1000),
+    wrong:g.wrong.map(w => `[${w.q.c}] ${w.q.q}${w.q.h ? ' — '+w.q.h : ''} (정답: ${w.answer})`),
+    sentAt:new Date().toISOString(),
+  };
+  line.hidden = false;
+  line.textContent = `${s.grade}학년 ${s.cls}반 ${s.num}번 ${s.name} · 기록을 보내는 중…`;
+  postRecord(rec)
+    .then(() => { line.textContent = `${s.grade}학년 ${s.cls}반 ${s.num}번 ${s.name} · 선생님께 기록을 보냈어요.`; flushPending(); })
+    .catch(() => { queueRecord(rec); line.textContent = '인터넷이 끊겨 기록을 보내지 못했어요. 다음에 접속하면 자동으로 다시 보내요.'; });
+}
+flushPending();
+
 /* ---------- 게임 상태 ---------- */
 let g = null;
 let state = 'title';   // title · play · quiz · paused · over
@@ -674,7 +749,7 @@ function newGame(){
     arrowT:1.6, enemyT:2, itemT:rand(4,6), fireT:.5, homingT:4,
     invuln:1.5, shield:0, power:0, rapid:0, poison:0, hints:0, shake:0,
     banner:{t:3, ch:0},
-    wrong:[], cur:null,
+    wrong:[], cur:null, t0:performance.now(),
   };
 }
 const CH = () => CHAPTERS[g.ch];
@@ -728,6 +803,7 @@ function movePlayer(dx,dy){
 /* ---------- 화면 전환 ---------- */
 function show(id, on){ $(id).hidden = !on; }
 function start(){
+  if(!checkStudent()) return;
   newGame();
   if(!g.enc.length) return;
   state = 'play';
@@ -963,6 +1039,7 @@ function endGame(won){
     if(w.q.e) add('ne', w.q.e);
     notes.appendChild(d);
   });
+  submitRecord(won, title);
   show('overScreen', true);
   $('overScreen').querySelector('.card').scrollTop = 0;
 }
