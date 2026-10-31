@@ -426,15 +426,15 @@ const QUESTIONS = [
 ];
 
 /* 난이도별 기본값: 정답 점수 · 오답 피해 · 제한 시간(초) */
-const DIFF = {1:{score:100,dmg:10,time:15},2:{score:200,dmg:15,time:18},3:{score:300,dmg:25,time:22}};
+const DIFF = {1:{score:100,dmg:15,time:15},2:{score:200,dmg:23,time:18},3:{score:300,dmg:38,time:22}};
 const CATS = ['한자','한자어휘','한자성어','고사성어','문장풀이','기타'];
 const GATES_PER_RUN = 15;   // 적장(陣) 수. 장마다 마지막 陣은 두 문제를 내는 대장
 const MAX_HP = 100;
 const FOE_HP = 5;           // 일반 적장 체력 (검기 1번 = 1)
 const BOSS_HP = 10;         // 장 끝 대장 체력
 const FINAL_BOSS_HP = 20;   // 마지막 대장(적국 성주) 체력
-const BOSS_Q = 2, FINAL_BOSS_Q = 3;
-const CHAPTER_HEAL = 30;    // 장 대장을 물리치면 회복하는 기력   // 대장 / 최종 대장이 내는 문제 수
+const BOSS_Q = 2, FINAL_BOSS_Q = 3;   // 대장 / 최종 대장이 내는 문제 수
+const CHAPTER_HEAL = 15;    // 장 대장 문제를 하나 맞힐 때마다 받는 승전 보상 기력
 const FIRE_RATES = [.3, .24, .19, .15];  // 검기 간격(초): 速 0~3단계
 const TRAVEL_X = 1.5;
 const EASE_FROM = 10, EASE_X = .9;   // 第11陣(0부터 세어 10)부터 화살·적 공격을 10% 약하게       // 적장·보스를 만나러 가는 거리 배율 (1 = 원래 길이)
@@ -472,8 +472,8 @@ const ENEMIES = {
   cavalry:{hp:3, r:17, touch:15, pts:80, name:'기병'},
 };
 const ITEMS = {
-  herb:   {ch:'藥',col:'#4e9a4a',w:32},
-  ginseng:{ch:'蔘',col:'#d29a3a',w:12},
+  herb:   {ch:'藥',col:'#4e9a4a',w:16},
+  ginseng:{ch:'蔘',col:'#d29a3a',w:6},
   shield: {ch:'盾',col:'#2f9a83',w:16},
   scroll: {ch:'書',col:'#6c5bb0',w:18},
   sword:  {ch:'劍',col:'#b08a3e',w:16},
@@ -854,8 +854,8 @@ function next(){
     if(e.hits>0){ g.kills++; burst(g.foe.x,g.foe.y,'#e2553a',40); floatText(g.foe.x,g.foe.y-30,'擊破!','#ffd27a',40); g.shake = reduceMotion?2:8; sfx.kill(); }
     else floatText(g.foe.x,g.foe.y-30,'적장 후퇴','#c9ccd1',26);
   }
-  if(e.boss && g.encIdx < g.enc.length-1){
-    const n = Math.min(CHAPTER_HEAL, MAX_HP - g.hp); g.hp += n; g.poison = 0;
+  if(e.boss && e.hits > 0 && g.encIdx < g.enc.length-1){
+    const n = Math.min(CHAPTER_HEAL * e.hits, MAX_HP - g.hp); g.hp += n; g.poison = 0;
     floatText(g.player.x, g.player.y-60, `승전 보상 · 기력 +${Math.round(n)}`, '#9be07a', 22);
   }
   g.foe = null; g.qi = 0; g.encIdx++;
