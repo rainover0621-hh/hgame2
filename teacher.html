@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>한문 출정기 배포</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+/* 선생님용 배포 페이지: 왼쪽에서 단원을 고르면 오른쪽에 학생용 주소와 QR이 바로 바뀌고, 인쇄하면 QR 안내문 한 장만 나온다 */
+:root{
+  --bg:#f3efe6; --paper:#fbf8f2; --ink:#1b1f27; --muted:#666b75; --line:#ddd3c1;
+  --vermilion:#c94a32; --jade:#2f8a76; --gold:#d9a94b;
+  --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#12161e; --paper:#1b212c; --ink:#eef0f3; --muted:#a3a9b4; --line:#2e3644; --vermilion:#ef6a4c; --jade:#4fbfa5; --gold:#e6b955; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#12161e; --paper:#1b212c; --ink:#eef0f3; --muted:#a3a9b4; --line:#2e3644; --vermilion:#ef6a4c; --jade:#4fbfa5; --gold:#e6b955; color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 48px}
+.wrap{max-width:980px;margin:0 auto;display:grid;gap:24px}
+header{display:grid;gap:4px}
+header small{font-weight:700;letter-spacing:.3em;color:var(--vermilion);font-size:13px}
+h1{margin:0;font-size:clamp(26px,4vw,36px);font-weight:900;letter-spacing:-.03em;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;min-width:0}
+h2{margin:0;font-size:17px;font-weight:700}
+.units{display:grid;gap:6px}
+.units label{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid var(--line);cursor:pointer;min-width:0}
+.units label:has(input:checked){border-color:var(--jade);background:color-mix(in srgb,var(--jade) 10%,transparent)}
+.units input{width:18px;height:18px;accent-color:var(--jade);flex:none}
+.units b{font-weight:900;color:var(--vermilion);flex:none;min-width:2.6em}
+.units span{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.units em{margin-left:auto;font-style:normal;font-size:12px;color:var(--muted);flex:none}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{font:inherit;font-size:14px;font-weight:700;border-radius:10px;padding:9px 14px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center}
+.primary{background:var(--vermilion);border-color:var(--vermilion);color:#fff}
+button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.sheet{display:grid;justify-items:center;text-align:center;gap:10px}
+.sheet .eyebrow{font-size:13px;font-weight:700;letter-spacing:.3em;color:var(--vermilion)}
+.sheet .title{font-size:30px;font-weight:900;letter-spacing:-.03em;line-height:1.1}
+#qr{width:min(100%,300px);aspect-ratio:1;background:#fff;border-radius:12px;padding:14px;border:1px solid var(--line)}
+#qr svg{width:100%;height:100%;display:block}
+.scope{font-weight:700}
+.url{font-size:13px;color:var(--muted);word-break:break-all;user-select:all;max-width:100%}
+.how{font-size:14px;color:var(--muted);margin:0;padding-left:1.2em;text-align:left}
+.note{font-size:13px;color:var(--muted);margin:0}
+.toast{font-size:13px;color:var(--jade);min-height:1.2em}
+@media print{
+  body{background:#fff;color:#000;padding:0}
+  header,.controls,.noprint{display:none!important}
+  .grid{display:block}
+  .panel{border:0;background:#fff;padding:0}
+  .sheet{margin-top:40px;gap:16px}
+  .sheet .title{font-size:44px}
+  #qr{width:420px;border:0}
+  .url,.how{color:#000}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <small>漢文遊戲 · 선생님용</small>
+    <h1>한문 출정기 배포</h1>
+    <p>출제할 단원을 고르면 학생용 주소와 QR이 바로 만들어집니다. 학생 화면에서는 단원을 바꿀 수 없고, 학생 정보(학년·반·번호·이름)를 적어야 출정할 수 있습니다.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel controls">
+      <h2>출제 단원</h2>
+      <div class="units" id="units"></div>
+      <div class="row">
+        <button type="button" id="all">전체 선택</button>
+        <button type="button" id="none">전체 해제</button>
+      </div>
+      <p class="note">한 판은 19문제입니다. 고른 단원의 낱말이 19개보다 적으면 그만큼 짧은 판이 됩니다.</p>
+      <h2>다른 페이지</h2>
+      <div class="row">
+        <a class="btn" href="test.html" target="_blank" rel="noopener">테스트 페이지 (단원·대장 바로 시작)</a>
+        <a class="btn" href="https://github.com/rainover0621-hh/hgame2/blob/main/docs/기록-저장-설정.md" target="_blank" rel="noopener">학생 기록 받기 설정</a>
+        <a class="btn" href="https://github.com/rainover0621-hh/hgame2/blob/main/docs/문제-목록.md" target="_blank" rel="noopener">문제 목록</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="sheet">
+        <span class="eyebrow">漢文遊戲</span>
+        <div class="title">한문 출정기</div>
+        <div id="qr" role="img" aria-label="학생용 게임 주소 QR 코드"></div>
+        <div class="scope" id="scope"></div>
+        <div class="url" id="url"></div>
+        <ol class="how">
+          <li>휴대전화 카메라로 QR을 비추세요.</li>
+          <li>학년 · 반 · 번호 · 이름을 적고 <b>출정하기</b>를 누르세요.</li>
+          <li>오른쪽 아래 방향 패드나 화면 끌기로 움직입니다.</li>
+        </ol>
+      </div>
+      <div class="row noprint">
+        <button type="button" class="primary" id="copy">주소 복사</button>
+        <button type="button" id="print">QR 안내문 인쇄</button>
+        <a class="btn" id="open" href="#" target="_blank" rel="noopener">학생 화면 열기</a>
+      </div>
+      <div class="toast noprint" id="toast" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<script src="assets/lib/qrcode.js"></script>
+<script>
+const UNITS = [["1","모양을 본뜨고, 기호로 나타내고",5],["2","뜻끼리 뭉치고, 뜻과 소리를 합하고",6],["3","앞을 먼저, 뒤는 나중에",13],["4","뒤를 먼저, 앞은 나중에",11],["5","숫자에 담긴 의미",10],["6","속담이 네 글자 속으로",6],["7","깊은 사연을 담아",8],["8","말과 행동은 진실하고 품위 있게",3]];
+const $ = id => document.getElementById(id);
+const GAME = new URL('./', location.href).href;   // 이 페이지와 같은 곳에 있는 index.html
+let chosen = new Set(UNITS.map(u => u[0]));
+try{ const s = JSON.parse(localStorage.getItem('cj-teacher-units')||'null'); if(Array.isArray(s) && s.length) chosen = new Set(s); }catch(e){}
+
+UNITS.forEach(([u, name, n]) => {
+  const l = document.createElement('label');
+  l.innerHTML = `<input type="checkbox" id="u${u}" value="${u}"><b>${u}과</b><span></span><em>낱말 ${n}</em>`;
+  l.querySelector('span').textContent = name;
+  l.querySelector('input').checked = chosen.has(u);
+  l.querySelector('input').onchange = e => { e.target.checked ? chosen.add(u) : chosen.delete(u); render(); };
+  $('units').appendChild(l);
+});
+$('all').onclick = () => { UNITS.forEach(([u]) => { chosen.add(u); $('u'+u).checked = true; }); render(); };
+$('none').onclick = () => { chosen.clear(); UNITS.forEach(([u]) => { $('u'+u).checked = false; }); render(); };
+
+function link(){
+  const us = UNITS.map(u => u[0]).filter(u => chosen.has(u));
+  return us.length === UNITS.length || !us.length ? GAME : `${GAME}?u=${us.join(',')}`;
+}
+function render(){
+  try{ localStorage.setItem('cj-teacher-units', JSON.stringify([...chosen])); }catch(e){}
+  const us = UNITS.map(u => u[0]).filter(u => chosen.has(u));
+  const url = link();
+  $('url').textContent = url;
+  $('open').href = url;
+  $('scope').textContent = !us.length ? '단원을 하나 이상 고르세요 (지금은 전체 단원으로 출제)' :
+    us.length === UNITS.length ? '출제 범위: 1~8과 전체' : `출제 범위: ${us.map(u => u+'과').join(' · ')}`;
+  const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+  $('qr').innerHTML = qr.createSvgTag({cellSize:8, margin:0, scalable:true});
+}
+$('copy').onclick = () => {
+  const url = link();
+  navigator.clipboard.writeText(url).then(() => { $('toast').textContent = '주소를 복사했습니다.'; },
+    () => { getSelection().selectAllChildren($('url')); $('toast').textContent = '주소를 선택했습니다. Ctrl+C로 복사하세요.'; });
+};
+$('print').onclick = () => window.print();
+render();
+</script>
+</body>
+</html>

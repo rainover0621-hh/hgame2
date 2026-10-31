@@ -195,6 +195,18 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
 .who input::-webkit-outer-spin-button,.who input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .whomsg{font-size:2.9cqw;font-weight:700;color:var(--vermilion)}
 .sendline{font-size:2.9cqw;color:var(--ink-soft)}
+.cats .unitchip{font-size:2.8cqw;font-weight:500;padding:.7cqw 2.4cqw;border-radius:9cqw;background:var(--ivory-2);color:var(--ink);box-shadow:inset 0 0 0 .25cqw var(--line)}
+
+/* 가상 방향 패드 (터치 기기) */
+#dpad{position:absolute;right:calc(3cqw + env(safe-area-inset-right,0px));bottom:calc(3cqw + env(safe-area-inset-bottom,0px));width:31cqw;height:31cqw;border-radius:50%;
+  background:radial-gradient(circle,#0a0e16 0 22%,#0a0e1666 23%);box-shadow:inset 0 0 0 .5cqw #ffffff30,0 1cqw 4cqw #0006;touch-action:none;-webkit-user-select:none;user-select:none;z-index:4;opacity:.85}
+#dpad i{position:absolute;width:0;height:0;border:3.4cqw solid transparent;opacity:.75;transition:opacity .08s,filter .08s}
+#dpad .u{left:50%;top:3cqw;transform:translateX(-50%);border-bottom:5cqw solid #f6f1e7;border-top:0}
+#dpad .d{left:50%;bottom:3cqw;transform:translateX(-50%);border-top:5cqw solid #f6f1e7;border-bottom:0}
+#dpad .l{top:50%;left:3cqw;transform:translateY(-50%);border-right:5cqw solid #f6f1e7;border-left:0}
+#dpad .r{top:50%;right:3cqw;transform:translateY(-50%);border-left:5cqw solid #f6f1e7;border-right:0}
+#dpad.on-u .u,#dpad.on-d .d,#dpad.on-l .l,#dpad.on-r .r{opacity:1;filter:drop-shadow(0 0 1.4cqw #e0b35a)}
+#dpad b{position:absolute;left:50%;top:50%;width:9cqw;height:9cqw;margin:-4.5cqw 0 0 -4.5cqw;border-radius:50%;background:#f6f1e733;box-shadow:inset 0 0 0 .4cqw #f6f1e755;transition:transform .05s}
 /* 테스트 패널 */
 .testbox{padding:2.6cqw 3cqw;border-radius:2cqw;background:#fff;box-shadow:inset 0 0 0 .3cqw var(--jade)}
 .testbox .label{color:var(--jade)}
@@ -215,6 +227,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
     <canvas id="game" aria-label="화살을 피하며 적진으로 진군하는 전장"></canvas>
     <div id="flash"></div>
 
+    <div id="dpad" hidden><i class="u"></i><i class="r"></i><i class="d"></i><i class="l"></i><b></b></div>
     <div id="testTag">테스트 모드</div>
     <div id="hud" hidden>
       <div class="row">
@@ -269,7 +282,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
         <section>
           <span class="label">조작법</span>
           <div class="ctrl">
-            <div><b>이동</b><span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · 화면 끌기</span></div>
+            <div><b>이동</b><span id="moveHelp"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> · 화면 끌기</span></div>
             <div><b>공격</b><span>검기가 자동으로 나가요</span></div>
             <div><b>답 고르기</b><span><kbd>1</kbd>–<kbd>4</kbd> 또는 터치</span></div>
             <div><b>병법서 · 일시정지</b><span><kbd>H</kbd> · <kbd>P</kbd></span></div>
@@ -295,7 +308,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
         </section>
 
         <section>
-          <span class="label">출제 범위</span>
+          <span class="label" id="unitLabel">출제 범위</span>
           <div class="cats" id="cats"></div>
         </section>
 
@@ -708,11 +721,25 @@ const unlockAudio = () => { const ac = ensureAudio(); try{ ac && ac.resume(); }c
 addEventListener('pointerdown', unlockAudio, {once:true});
 addEventListener('keydown', unlockAudio, {once:true});
 
-/* ---------- 출제 범위 선택 ---------- */
-let selCats = new Set(CATS);
-try{ const s = JSON.parse(store.get('cj-units')||'null'); if(Array.isArray(s) && s.length) selCats = new Set(s.filter(c=>CATS.includes(c))); }catch(e){}
-if(!selCats.size) selCats = new Set(CATS);
+/* ---------- 출제 범위 ----------
+   학생 화면: 선생님이 배포한 주소의 ?u=1,2,3 으로 정해진 과만 출제되고, 학생은 바꿀 수 없음 (없으면 1~8과 전체)
+   TEACHER_MODE(테스트 페이지): 첫 화면에서 과를 직접 고를 수 있음 */
+const TEACHER_MODE = true;   // 테스트 페이지: 단원 직접 선택 · 학생 정보 없이 시작
+const URL_UNITS = (() => {
+  try{ const v = new URLSearchParams(location.search).get('u'); return v ? v.split(/[,\s]+/).filter(u => CATS.includes(u)) : []; }
+  catch(e){ return []; }
+})();
+let selCats = new Set(URL_UNITS.length ? URL_UNITS : CATS);
+if(TEACHER_MODE){
+  try{ const s = JSON.parse(store.get('cj-units')||'null'); if(Array.isArray(s) && s.length) selCats = new Set(s.filter(c=>CATS.includes(c))); }catch(e){}
+  if(!selCats.size) selCats = new Set(CATS);
+}
 function renderCats(){
+  if(!TEACHER_MODE){
+    $('unitLabel').textContent = '출제 범위 · 선생님이 정한 단원';
+    $('cats').innerHTML = [...selCats].map(u => `<span class="unitchip">${u}과</span>`).join('');
+    return;
+  }
   $('cats').innerHTML = '';
   CATS.forEach((c,i) => {
     const b = document.createElement('button');
@@ -745,8 +772,8 @@ try{
 ['stGrade','stClass','stNum','stName'].forEach(id => $(id).addEventListener('input', () => { $('whoMsg').hidden = true; store.set('cj-student', JSON.stringify(student())); }));
 function checkStudent(){
   const s = student();
-  if(!RECORD_URL || (s.cls && s.num && s.name)) return true;
-  $('whoMsg').textContent = '기록을 남기려면 반, 번호, 이름을 모두 적어 주세요.';
+  if(TEACHER_MODE || (s.cls && s.num && s.name)) return true;
+  $('whoMsg').textContent = '반, 번호, 이름을 모두 적어야 출정할 수 있어요.';
   $('whoMsg').hidden = false;
   $(!s.cls ? 'stClass' : !s.num ? 'stNum' : 'stName').focus();
   $('titleScreen').querySelector('.card').scrollTop = 0;
@@ -864,6 +891,28 @@ const endDrag = () => { drag = null; };
 stage.addEventListener('pointerup', endDrag);
 stage.addEventListener('pointercancel', endDrag);
 document.addEventListener('visibilitychange', () => { if(document.hidden && state==='play') pause(); });
+
+/* 가상 방향 패드: 터치 기기에서 진군 중에만 오른쪽 아래에 보임. 손가락을 미끄러뜨리면 대각선도 됨 */
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+const pad = $('dpad'); let padId = null;
+if(IS_TOUCH) $('moveHelp').textContent = '오른쪽 아래 방향 패드 · 화면 끌기';
+function padSet(dx, dy){
+  const r = pad.clientWidth/2, dead = r*.2, ax = Math.abs(dx), ay = Math.abs(dy);
+  keys.arrowleft = dx < -dead && ax > ay*.45; keys.arrowright = dx > dead && ax > ay*.45;
+  keys.arrowup = dy < -dead && ay > ax*.45;  keys.arrowdown = dy > dead && ay > ax*.45;
+  pad.className = ['u','d','l','r'].filter((k,i) => [keys.arrowup,keys.arrowdown,keys.arrowleft,keys.arrowright][i]).map(k => 'on-'+k).join(' ');
+  const m = Math.min(1, Math.hypot(dx,dy)/r);
+  pad.querySelector('b').style.transform = `translate(${dx/Math.max(1,Math.hypot(dx,dy))*m*r*.45}px,${dy/Math.max(1,Math.hypot(dx,dy))*m*r*.45}px)`;
+}
+function padClear(){ padId = null; keys.arrowleft = keys.arrowright = keys.arrowup = keys.arrowdown = false; pad.className = ''; pad.querySelector('b').style.transform = ''; }
+function padAt(e){ const rc = pad.getBoundingClientRect(); padSet(e.clientX - rc.left - rc.width/2, e.clientY - rc.top - rc.height/2); }
+pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); padId = e.pointerId; try{ pad.setPointerCapture(e.pointerId); }catch(_){} padAt(e); });
+pad.addEventListener('pointermove', e => { if(e.pointerId === padId) padAt(e); });
+['pointerup','pointercancel','lostpointercapture'].forEach(t => pad.addEventListener(t, e => { if(e.pointerId === padId) padClear(); }));
+function syncPad(){
+  const on = IS_TOUCH && state === 'play';
+  if(pad.hidden === on){ pad.hidden = !on; if(!on) padClear(); }
+}
 
 const ROAD_L = 58, ROAD_R = W-58;
 function movePlayer(dx,dy){
@@ -1400,6 +1449,7 @@ function takeItem(it){
 let hudCache = {};
 function setText(id, v){ if(hudCache[id]!==v){ hudCache[id]=v; $(id).textContent=v; } }
 function syncHud(){
+  syncPad();
   if(!g) return;
   const pct = g.hp/MAX_HP*100;
   $('hpBar').style.width = pct+'%';
