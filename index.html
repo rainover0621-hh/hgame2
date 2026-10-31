@@ -414,6 +414,7 @@ const BOSS_Q = 2, FINAL_BOSS_Q = 3;   // 대장 / 최종 대장이 내는 문제
 const CHAPTER_HEAL = 15;    // 장 대장 문제를 하나 맞힐 때마다 받는 승전 보상 기력
 const FIRE_RATES = [.3, .24, .19, .15];  // 검기 간격(초): 速 0~3단계
 const TRAVEL_X = 1.5;
+const HARD = 1.1;           // 전체 난이도 배율: 화살·적이 나오는 빈도와 오답 피해 (1 = 기본, 1.1 = 10% 어렵게)
 const EASE_FROM = 10, EASE_X = .9;   // 第11陣(0부터 세어 10)부터 화살·적 공격을 10% 약하게       // 적장·보스를 만나러 가는 거리 배율 (1 = 원래 길이)
 
 /* 장(章)별 전장 설정 — 뒤로 갈수록 화살 종류가 늘고 빨라짐 */
@@ -724,7 +725,7 @@ $('pauseBtn').onclick = () => { if(state==='play') pause(); };
 /* ---------- 적장과의 문답 ---------- */
 function stakes(q){
   const d = DIFF[q.d]||DIFF[1], c = CH();
-  return {score:Math.round((q.score??d.score)*c.scoreX), dmg:Math.round((q.dmg??d.dmg)*c.dmgX), time:q.time??d.time};
+  return {score:Math.round((q.score??d.score)*c.scoreX), dmg:Math.round((q.dmg??d.dmg)*c.dmgX*HARD), time:q.time??d.time};
 }
 function foeName(e){ return e.boss ? CHAPTERS[e.ch].boss : '적장(敵將)'; }
 
@@ -1042,7 +1043,7 @@ function update(dt){
         if(f.x > ROAD_R-50){ f.x = ROAD_R-50; f.dir = -1; }
         f.shotT -= dt;
         if(f.shotT <= 0){
-          f.shotT = (f.boss ? 1.7 - g.ch*.3 : 1.9 - g.ch*.25) / ease() * rand(.85,1.15);
+          f.shotT = (f.boss ? 1.7 - g.ch*.3 : 1.9 - g.ch*.25) / ease() / HARD * rand(.85,1.15);
           const kind = weighted(c.kinds), s = c.arrowSpd*.95*ARROWS[kind].spd*ease(), n = f.boss ? 3 + g.ch : 1 + Math.min(g.ch,1);
           const base = Math.atan2(p.y-f.y, p.x-f.x);
           for(let i=0;i<n;i++){ const a = base + (i-(n-1)/2)*.2; addArrow(f.x+Math.cos(a)*30, f.y+Math.sin(a)*30, Math.cos(a)*s, Math.sin(a)*s, kind); }
@@ -1060,12 +1061,12 @@ function update(dt){
   // 화살
   g.arrowT -= dt;
   if(g.arrowT <= 0 && !quiet){
-    g.arrowT = c.arrowInt / ramp() * rand(.7,1.25);
+    g.arrowT = c.arrowInt / ramp() / HARD * rand(.7,1.25);
     spawnPattern(c);
   }
   g.homingT -= dt;
   if(g.homingT <= 0 && !quiet){
-    g.homingT = c.homing.every / ramp() * rand(.8,1.2);
+    g.homingT = c.homing.every / ramp() / HARD * rand(.8,1.2);
     if(g.arrows.filter(a=>a.kind==='homing').length < c.homing.max){
       const x = rand(ROAD_L, ROAD_R);
       addArrow(x, -30, 0, c.arrowSpd*ARROWS.homing.spd*ease(), 'homing');
@@ -1117,7 +1118,7 @@ function update(dt){
 
   // 적병
   g.enemyT -= dt;
-  if(g.enemyT <= 0 && !noEnemies){ g.enemyT = c.enemyInt / ramp() * rand(.75,1.25); spawnEnemy(c); }
+  if(g.enemyT <= 0 && !noEnemies){ g.enemyT = c.enemyInt / ramp() / HARD * rand(.75,1.25); spawnEnemy(c); }
   g.enemies = g.enemies.filter(en => {
     const E = ENEMIES[en.type];
     en.t += dt; en.flash = Math.max(0, en.flash - dt);

@@ -38,7 +38,7 @@
 
 - `c` 분류 · `d` 난이도(1~3) · `q` 질문 · `h` 크게 보여 줄 한자(선택) · `e` 해설
 
-난이도·체력 등은 파일 위쪽 설정값(`CHAPTERS`, `ARROWS`, `FOE_HP`, `BOSS_HP`, `FINAL_BOSS_HP`, `FIRE_RATES`, `TRAVEL_X`, `EASE_FROM`, `EASE_X`)에서 바꿀 수 있습니다.
+난이도·체력 등은 파일 위쪽 설정값(`HARD`, `CHAPTERS`, `ARROWS`, `FOE_HP`, `BOSS_HP`, `FINAL_BOSS_HP`, `FIRE_RATES`, `TRAVEL_X`, `EASE_FROM`, `EASE_X`)에서 바꿀 수 있습니다.
 
 ## 음원
 
