@@ -225,6 +225,24 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
 .card.done .choices{gap:1.2cqw;margin-top:1.8cqw}
 .card.done .choices button{padding:1.5cqw 3cqw}
 .card.done .fb{margin-top:2cqw;padding-top:2cqw;gap:1.2cqw}
+/* 오늘의 순위 */
+.footline{display:flex;align-items:center;justify-content:space-between;gap:2cqw;flex-wrap:wrap}
+.foot .footline .keys{text-align:left}
+.linkbtn{font:inherit;font-size:3cqw;font-weight:700;color:var(--jade);background:none;border:0;padding:.6cqw 0;cursor:pointer;text-decoration:underline;text-underline-offset:.6cqw;margin-left:auto}
+.rankhead{display:flex;align-items:baseline;justify-content:space-between;gap:2cqw}
+.ranks{list-style:none;margin:0;padding:0;display:grid;gap:1.2cqw}
+.ranks li{display:grid;grid-template-columns:7cqw minmax(0,1fr) auto;align-items:center;gap:2.2cqw;background:#fff;border-radius:2cqw;padding:1.5cqw 2.6cqw;box-shadow:inset 0 0 0 .25cqw var(--line);font-size:3.2cqw}
+.ranks li.me{background:#fff7e3;box-shadow:inset 0 0 0 .5cqw var(--gold)}
+.ranks .rk{font-weight:900;text-align:center;font-size:3.8cqw;color:var(--ink-soft)}
+.ranks .rk.r1{color:#c8961e}.ranks .rk.r2{color:#8a96a8}.ranks .rk.r3{color:#b0703c}
+.ranks .nm{min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ranks .nm small{display:block;font-size:2.6cqw;font-weight:500;color:var(--ink-soft)}
+.ranks .sc{font-weight:900;font-variant-numeric:tabular-nums;text-align:right}
+.ranks .sc small{display:block;font-size:2.6cqw;font-weight:500;color:var(--ink-soft)}
+.ranks .empty{display:block;text-align:center;color:var(--ink-soft);background:none;box-shadow:none}
+.mine{display:grid;gap:.8cqw;font-size:3cqw}
+.mine div{display:flex;gap:2cqw;justify-content:space-between;border-bottom:1px dashed var(--line);padding-block:.6cqw;font-variant-numeric:tabular-nums}
+.mine .none{color:var(--ink-soft);border:0}
 /* 테스트 패널 */
 .testbox{padding:2.6cqw 3cqw;border-radius:2cqw;background:#fff;box-shadow:inset 0 0 0 .3cqw var(--jade)}
 .testbox .label{color:var(--jade)}
@@ -336,7 +354,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
             <button class="btn" id="startBtn" type="button">출정하기</button>
             <button class="btn ghost" id="soundBtn" type="button" aria-pressed="true">소리 켬</button>
           </div>
-          <p class="keys" id="bestLine"></p>
+          <div class="footline"><p class="keys" id="bestLine"></p><button class="linkbtn" id="rankBtnT" type="button">오늘의 순위 · 내 기록</button></div>
         </footer>
       </div>
     </div>
@@ -376,6 +394,25 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
       </div>
     </div>
 
+    <!-- 오늘의 순위 -->
+    <div class="overlay" id="rankScreen" hidden>
+      <div class="card stack">
+        <div class="rankhead"><h2>오늘의 순위</h2><span class="keys" id="rankDate"></span></div>
+        <div class="cats" role="group" aria-label="순위 범위">
+          <button type="button" id="rkAll" aria-pressed="true">전체</button>
+          <button type="button" id="rkClass" aria-pressed="false">우리 반</button>
+        </div>
+        <p class="keys" id="rankStatus"></p>
+        <ol class="ranks" id="rankList"></ol>
+        <span class="label">이 기기에서 오늘 한 기록</span>
+        <div class="mine" id="myList"></div>
+        <div class="split">
+          <button class="btn ghost" id="rankRefresh" type="button">새로고침</button>
+          <button class="btn" id="rankClose" type="button">닫기</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 결과 -->
     <div class="overlay" id="overScreen" hidden>
       <div class="card stack">
@@ -400,6 +437,7 @@ button:focus-visible{outline:.6cqw solid var(--gold);outline-offset:.5cqw}
           <button class="btn" id="againBtn" type="button">다시 출정</button>
           <button class="btn ghost" id="homeBtn" type="button">처음으로</button>
         </div>
+        <button class="btn ghost" id="rankBtnO" type="button">오늘의 순위 보기</button>
       </div>
     </div>
   </div>
@@ -983,6 +1021,107 @@ function submitRecord(won, title){
 }
 flushPending();
 
+/* ---------- 오늘의 순위 · 내 기록 ----------
+   선생님 시트(RECORD_URL)가 연결되어 있으면 오늘 전체 순위를 불러오고(학생별 최고 점수, 이름 가운데는 *),
+   연결 전이거나 인터넷이 안 되면 이 기기에서 오늘 한 기록으로 순위를 보여 줌 */
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const maskName = n => n.length <= 1 ? n : n.length === 2 ? n[0]+'*' : n[0] + '*'.repeat(n.length-2) + n[n.length-1];
+function loadLocal(){ try{ const a = JSON.parse(store.get('cj-history')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function saveLocal(won, title){
+  const s = student(), d = new Date();
+  const list = loadLocal();
+  list.push({d:todayStr(), t:`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+    grade:s.grade, cls:s.cls, num:s.num, name:s.name, score:g.score, result:title, done:won?1:0, correct:g.correct, answered:g.answered});
+  store.set('cj-history', JSON.stringify(list.slice(-80)));
+}
+let rankMode = 'all', rankData = null, rankFrom = null;
+function openRank(){
+  rankFrom = !$('overScreen').hidden ? 'overScreen' : 'titleScreen';
+  show(rankFrom, false); show('rankScreen', true);
+  const d = new Date(); $('rankDate').textContent = `${d.getMonth()+1}월 ${d.getDate()}일`;
+  renderMine(); loadRank();
+  $('rankClose').focus({preventScroll:true});
+}
+function closeRank(){ show('rankScreen', false); show(rankFrom || 'titleScreen', true); }
+function renderMine(){
+  const mine = loadLocal().filter(r => r.d === todayStr()).reverse();
+  $('myList').innerHTML = '';
+  if(!mine.length){ $('myList').innerHTML = '<div class="none">오늘은 아직 출정 기록이 없어요.</div>'; return; }
+  mine.forEach(r => {
+    const row = document.createElement('div');
+    row.textContent = `${r.t} · ${r.result} · ${r.correct}/${r.answered} 정답`;
+    const b = document.createElement('b'); b.textContent = `${Number(r.score).toLocaleString()}점`;
+    row.appendChild(b); $('myList').appendChild(row);
+  });
+}
+function localRank(){
+  const best = {};
+  loadLocal().filter(r => r.d === todayStr()).forEach(r => {
+    const k = [r.grade,r.cls,r.num,r.name].join('|');
+    const b = best[k] || (best[k] = {grade:r.grade, cls:r.cls, num:r.num, name:maskName(r.name||''), score:-1, result:'', plays:0, done:0});
+    b.plays++; if(r.done) b.done = 1;
+    if(r.score > b.score){ b.score = r.score; b.result = r.result; }
+  });
+  return Object.values(best).sort((a,b) => b.score - a.score);
+}
+function loadRank(){
+  rankData = null;
+  if(!RECORD_URL){
+    rankData = localRank();
+    $('rankStatus').textContent = '선생님 기록 시트가 아직 연결되지 않아, 이 기기에서 한 기록으로 순위를 보여 줘요.';
+    return renderRank();
+  }
+  $('rankStatus').textContent = '선생님 기록 시트에서 오늘 순위를 불러오는 중…';
+  $('rankList').innerHTML = '';
+  const ctl = 'AbortController' in window ? new AbortController() : null;
+  const timer = setTimeout(() => ctl && ctl.abort(), 9000);
+  fetch(`${RECORD_URL}?action=rank&t=${Date.now()}`, ctl ? {signal:ctl.signal} : {})
+    .then(r => r.json())
+    .then(j => {
+      rankData = Array.isArray(j.players) ? j.players : [];
+      const d = new Date();
+      $('rankStatus').textContent = `오늘 ${j.plays||0}번 출정 · ${rankData.length}명 · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 기준`;
+      renderRank();
+    })
+    .catch(() => {
+      rankData = localRank();
+      $('rankStatus').textContent = '순위를 불러오지 못했어요. 인터넷을 확인해 주세요. 지금은 이 기기 기록만 보여요.';
+      renderRank();
+    })
+    .finally(() => clearTimeout(timer));
+}
+function renderRank(){
+  const s = student(), list = $('rankList');
+  $('rkAll').setAttribute('aria-pressed', rankMode === 'all'); $('rkClass').setAttribute('aria-pressed', rankMode === 'class');
+  let rows = rankData || [];
+  if(rankMode === 'class') rows = rows.filter(r => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls));
+  list.innerHTML = '';
+  if(!rows.length){
+    const li = document.createElement('li'); li.className = 'empty';
+    li.textContent = rankMode === 'class' && !s.cls ? '첫 화면에 반을 적으면 우리 반 순위를 볼 수 있어요.' : '아직 오늘 기록이 없어요.';
+    list.appendChild(li); return;
+  }
+  const myName = maskName(s.name);
+  let rank = 0, prev = null;
+  rows.slice(0, 50).forEach((r, i) => {
+    if(r.score !== prev){ rank = i + 1; prev = r.score; }
+    const li = document.createElement('li');
+    if(String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && r.name === myName) li.className = 'me';
+    const rk = document.createElement('span'); rk.className = 'rk' + (rank <= 3 ? ' r'+rank : ''); rk.textContent = rank;
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name || '이름 없음';
+    const sub = document.createElement('small'); sub.textContent = `${r.grade}학년 ${r.cls}반 ${r.num}번 · ${r.plays||1}번 출정`; nm.appendChild(sub);
+    const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = Number(r.score).toLocaleString();
+    const rs = document.createElement('small'); rs.textContent = r.result || ''; sc.appendChild(rs);
+    li.append(rk, nm, sc); list.appendChild(li);
+  });
+}
+$('rankBtnT').onclick = openRank;
+$('rankBtnO').onclick = openRank;
+$('rankClose').onclick = closeRank;
+$('rankRefresh').onclick = () => { renderMine(); loadRank(); };
+$('rkAll').onclick = () => { rankMode = 'all'; renderRank(); };
+$('rkClass').onclick = () => { rankMode = 'class'; renderRank(); };
+
 /* ---------- 게임 상태 ---------- */
 let g = null;
 let state = 'title';   // title · play · quiz · paused · over
@@ -1045,7 +1184,8 @@ addEventListener('keydown', e => {
     if(!rv.cur.done){ const n = parseInt(k,10); if(n>=1 && n<=4) reviewPick(n-1); }
     else if(k==='Enter'||k===' '){ e.preventDefault(); reviewNext(); }
   }
-  else if(state==='title' && k==='Enter' && document.activeElement===document.body) start();
+  else if(state==='title' && k==='Enter' && document.activeElement===document.body && $('rankScreen').hidden) start();
+  if(k==='Escape' && !$('rankScreen').hidden) closeRank();
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 
@@ -1111,7 +1251,7 @@ function start(){
   newGame();
   if(!g.enc.length) return;
   state = 'play';
-  show('titleScreen',false); show('overScreen',false); show('pauseScreen',false); show('quiz',false); show('hud',true);
+  show('titleScreen',false); show('overScreen',false); show('pauseScreen',false); show('quiz',false); show('rankScreen',false); show('hud',true);
   try{ ensureAudio(); audio.ctx && audio.ctx.resume(); }catch(e){}
   playBgm(CHAPTER_BGM[g.ch]);
 }
@@ -1345,6 +1485,7 @@ function endGame(won){
     if(w.q.e) add('ne', w.q.e);
     notes.appendChild(d);
   });
+  saveLocal(won, title);
   submitRecord(won, title);
   show('overScreen', true);
   $('overScreen').querySelector('.card').scrollTop = 0;

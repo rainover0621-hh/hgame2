@@ -32,9 +32,45 @@ function doPost(e) {
   }
 }
 
-// 브라우저로 웹 앱 주소를 열었을 때 확인용
-function doGet() {
+// 브라우저로 웹 앱 주소를 열었을 때 확인용 + 게임의 '오늘의 순위' (…/exec?action=rank)
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (p.action === 'rank') {
+    return ContentService.createTextOutput(JSON.stringify(todayRank_()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return ContentService.createTextOutput('한문 출정기 기록을 받을 준비가 되었습니다.');
+}
+
+// 오늘 기록만 모아 학생별 최고 점수 순으로. 이름은 가운데 글자를 *로 가려서 보냄
+function todayRank_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tz = ss.getSpreadsheetTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const sh = ss.getSheetByName('기록');
+  if (!sh || sh.getLastRow() < 2) return {date: today, plays: 0, players: []};
+  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, RECORD_HEAD.length).getValues();
+  const best = {};
+  let plays = 0;
+  rows.forEach(r => {
+    if (!(r[0] instanceof Date) || Utilities.formatDate(r[0], tz, 'yyyy-MM-dd') !== today) return;
+    plays++;
+    const key = [r[1], r[2], r[3], r[4]].join('|');
+    const b = best[key] || (best[key] = {grade: String(r[1]), cls: String(r[2]), num: String(r[3]),
+      name: mask_(String(r[4])), score: -1, result: '', done: 0, plays: 0});
+    b.plays++;
+    if (Number(r[6]) === 1) b.done = 1;
+    const score = Number(r[7]) || 0;
+    if (score > b.score) { b.score = score; b.result = String(r[5]); }
+  });
+  const players = Object.keys(best).map(k => best[k]).sort((a, b) => b.score - a.score).slice(0, 200);
+  return {date: today, plays: plays, players: players};
+}
+
+function mask_(n) {
+  if (n.length <= 1) return n;
+  if (n.length === 2) return n[0] + '*';
+  return n[0] + '*'.repeat(n.length - 2) + n[n.length - 1];
 }
 
 // 수식으로 오인되지 않게 앞의 =,+,-,@ 를 막고 길이를 제한
