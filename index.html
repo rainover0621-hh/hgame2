@@ -971,7 +971,7 @@ showBest();
 /* ---------- 학생 정보 · 기록 전송 ----------
    RECORD_URL 에 선생님의 Apps Script 웹 앱 주소(…/exec)를 넣으면,
    게임이 끝날 때마다 결과가 선생님의 구글 시트에 한 줄씩 쌓입니다. 비워 두면 보내지 않습니다. */
-const RECORD_URL = '';
+const RECORD_URL = 'https://script.google.com/macros/s/AKfycbxq0BWex7fup_vQ2LBc3RKr41nC7Q_xBUd5QijuNxgPvZfjq4axgn31R5DtgDfdXjygzg/exec';
 const student = () => ({grade:$('stGrade').value, cls:$('stClass').value.trim(), num:$('stNum').value.trim(), name:$('stName').value.trim()});
 try{
   const s0 = JSON.parse(store.get('cj-student')||'null');
