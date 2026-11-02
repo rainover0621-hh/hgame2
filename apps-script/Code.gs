@@ -2,7 +2,8 @@
  * 한문 출정기 기록 수신용 Apps Script
  * 구글 시트 → 확장 프로그램 → Apps Script 에 이 코드를 그대로 붙여 넣고,
  * 「웹 앱」으로 배포한 주소(…/exec)를 게임의 RECORD_URL 에 넣으면 됩니다.
- * 처음 기록이 들어오면 '기록', '오답', '요약', '많이 틀린 문제' 시트가 자동으로 만들어집니다.
+ * 처음 기록이 들어오면 '기록', '오답', '요약', '많이 틀린 문제', '명렬' 시트가 자동으로 만들어집니다.
+ * '명렬' 시트 A~D열(학년·반·번호·이름)에 학생 명단을 붙여 넣으면 E열부터 학생별 기록이 자동으로 채워집니다.
  */
 const RECORD_HEAD = ['받은 시각','학년','반','번호','이름','결과','완주(1)','점수','맞힌 수','푼 수','정답률','도달','물리친 적','최고 연속','출제 범위','플레이(초)','틀린 문제'];
 const WRONG_HEAD = ['받은 시각','학년','반','번호','이름','틀린 문제'];
@@ -15,7 +16,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     setup_(ss);
     const now = new Date();
-    const who = [clean_(d.grade), clean_(d.cls), clean_(d.num), clean_(d.name)];
+    const who = [num_(d.grade), num_(d.cls), num_(d.num), clean_(d.name)];
     const answered = Number(d.answered) || 0, correct = Number(d.correct) || 0;
     const wrong = Array.isArray(d.wrong) ? d.wrong.map(clean_) : [];
     ss.getSheetByName('기록').appendRow([now, ...who, clean_(d.result), d.done ? 1 : 0, Number(d.score) || 0,
@@ -73,6 +74,12 @@ function mask_(n) {
   return n[0] + '*'.repeat(n.length - 2) + n[n.length - 1];
 }
 
+// 학년·반·번호는 숫자로 저장 (명렬과 맞춰 보기 위해)
+function num_(v) {
+  const s = String(v == null ? '' : v).trim();
+  return /^\d+$/.test(s) ? Number(s) : clean_(s);
+}
+
 // 수식으로 오인되지 않게 앞의 =,+,-,@ 를 막고 길이를 제한
 function clean_(v) {
   const s = String(v == null ? '' : v).slice(0, 500);
@@ -104,6 +111,24 @@ function setup_(ss) {
       "max(H) '최고 점수', avg(K) '평균 정답률', max(A) '마지막 플레이'\", 0)");
     sh.getRange('H:H').setNumberFormat('0%');
     sh.getRange('I:I').setNumberFormat('yyyy-mm-dd hh:mm');
+    sh.setFrozenRows(1);
+  }
+  if (!ss.getSheetByName('명렬')) {
+    // A~D: 선생님이 붙여 넣는 명단 / E~J: 기록 시트에서 자동 계산 (학년·반·번호로 맞춤)
+    const sh = ss.insertSheet('명렬');
+    sh.getRange(1, 1, 1, 10).setValues([['학년', '반', '번호', '이름', '플레이 횟수', '완주 횟수', '최고 점수', '평균 정답률', '오늘 최고 점수', '마지막 플레이']])
+      .setFontWeight('bold').setBackground('#f6f1e7');
+    sh.getRange(1, 5, 1, 6).setBackground('#e6efe9');
+    const key = "'기록'!B:B,g,'기록'!C:C,c,'기록'!D:D,n";
+    const f = (body) => '=MAP(A2:A,B2:B,C2:C,LAMBDA(g,c,n,IF(n="","",' + body + ')))';
+    sh.getRange('E2').setFormula(f('COUNTIFS(' + key + ')'));
+    sh.getRange('F2').setFormula(f('SUMIFS(\'기록\'!G:G,' + key + ')'));
+    sh.getRange('G2').setFormula(f('IFERROR(1/(1/MAXIFS(\'기록\'!H:H,' + key + ')),"-")'));
+    sh.getRange('H2').setFormula(f('IFERROR(AVERAGEIFS(\'기록\'!K:K,' + key + '),"-")'));
+    sh.getRange('I2').setFormula(f('IFERROR(1/(1/MAXIFS(\'기록\'!H:H,' + key + ",'기록'!A:A,\">=\"&TODAY())),\"-\")"));
+    sh.getRange('J2').setFormula(f('IFERROR(1/(1/MAXIFS(\'기록\'!A:A,' + key + ')),"-")'));
+    sh.getRange('H:H').setNumberFormat('0%');
+    sh.getRange('J:J').setNumberFormat('mm-dd hh:mm');
     sh.setFrozenRows(1);
   }
   if (!ss.getSheetByName('많이 틀린 문제')) {
