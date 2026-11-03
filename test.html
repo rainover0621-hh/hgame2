@@ -741,6 +741,7 @@ const FOE_HP = 10;          // 일반 적장 체력 (검기 1번 = 1)
 const BOSS_HP = 10;         // 장 끝 대장 체력
 const FINAL_BOSS_HP = 20;   // 마지막 대장(적국 성주) 체력
 const RAGE_AT = .5, RAGE_X = 1.3;   // 최종 대장 2단계: 체력 50% 이하에서 격노, 사격 1.3배 빠르게 + 2발 더 + 신기전
+const BOSS_SCALE = 1.5, FOE_SCALE = 1.35;   // 대장 / 적장 크기 (이전 1.9 / 1.5)
 const BOSS_INV = 2;         // 대장이 싸움을 시작한 뒤 검기가 통하지 않는 시간(초)
 const BOSS_Q = 2, FINAL_BOSS_Q = 3;   // 대장 / 최종 대장이 내는 문제 수
 const CHAPTER_HEAL = 15;    // 장 대장 문제를 하나 맞힐 때마다 받는 승전 보상 기력
@@ -1655,7 +1656,7 @@ function update(dt){
   g.waves = g.waves.filter(w => {
     w.x += w.vx*dt; w.y += w.vy*dt;
     if(w.y < -30 || w.x < 0 || w.x > W) return false;
-    if(g.foe && Math.abs(w.x-g.foe.x) < (g.foe.boss?36:30) && Math.abs(w.y-g.foe.y) < 30){
+    if(g.foe && Math.abs(w.x-g.foe.x) < (g.foe.boss?30:27) && Math.abs(w.y-g.foe.y) < 28){
       const f = g.foe;
       if(f.phase==='fight' && f.hp > 0 && f.invT > 0){ burst(w.x,w.y,'#ffe08a',3); }
       else if(f.phase==='fight' && f.hp > 0){
@@ -1685,7 +1686,7 @@ function update(dt){
     f.t += dt; f.flash = Math.max(0, f.flash - dt);
     if(f.phase==='enter'){
       f.y += dy*1.2;
-      const stopY = f.boss ? 200 : 165;   // 대장은 체력바에 가리지 않게 조금 아래에서 멈춤
+      const stopY = f.boss ? 180 : 160;   // 대장은 체력바에 가리지 않게 조금 아래에서 멈춤
       if(f.y >= stopY){
         f.y = stopY;
         f.phase = 'fight'; sfx.foe(); if(f.boss){ playBgm('bgm_boss'); f.invT = BOSS_INV; }
@@ -2358,9 +2359,9 @@ function drawEnemy(en){
   }
 }
 function drawFoe(f){
-  const sc = f.boss ? 1.9 : 1.5, fx0 = f.x - 27*sc, wave = Math.sin(f.t*4);
+  const sc = f.boss ? BOSS_SCALE : FOE_SCALE, fx0 = f.x - 27*sc, wave = Math.sin(f.t*4);
   if(f.rage && f.hp > 0){   // 2단계 격노: 붉은 기운
-    const pr = 46 + Math.sin(f.t*9)*6;
+    const pr = (46 + Math.sin(f.t*9)*6) * sc / 1.9;
     ctx.globalCompositeOperation = 'lighter';
     const rg = ctx.createRadialGradient(f.x, f.y, 10, f.x, f.y, pr);
     rg.addColorStop(0,'rgba(255,70,40,.45)'); rg.addColorStop(1,'rgba(255,70,40,0)');
