@@ -95,7 +95,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
       </div>
       <h2>다른 페이지</h2>
       <div class="row">
-        <a class="btn" href="test.html" target="_blank" rel="noopener">테스트 페이지 (단원·대장 바로 시작)</a>
+        <a class="btn" href="https://rainover0621-hh.github.io/hgame2/test.html" target="_blank" rel="noopener">테스트 페이지 (단원·대장 바로 시작)</a>
         <a class="btn" href="https://github.com/rainover0621-hh/hgame2/blob/main/docs/기록-저장-설정.md" target="_blank" rel="noopener">학생 기록 받기 설정</a>
         <a class="btn" href="https://github.com/rainover0621-hh/hgame2/blob/main/docs/문제-목록.md" target="_blank" rel="noopener">문제 목록</a>
       </div>
@@ -129,7 +129,9 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
 <script>
 const UNITS = [["1","모양을 본뜨고, 기호로 나타내고",5],["2","뜻끼리 뭉치고, 뜻과 소리를 합하고",6],["3","앞을 먼저, 뒤는 나중에",13],["4","뒤를 먼저, 앞은 나중에",11],["5","숫자에 담긴 의미",10],["6","속담이 네 글자 속으로",6],["7","깊은 사연을 담아",8],["8","말과 행동은 진실하고 품위 있게",3]];
 const $ = id => document.getElementById(id);
-const GAME = new URL('./', location.href).href;   // 이 페이지와 같은 곳에 있는 index.html
+// 학생용 게임 주소: GitHub Pages에서 열면 같은 폴더, 그 밖(claude.ai 등)에서 열면 공개 주소
+const PAGES = 'https://rainover0621-hh.github.io/hgame2/';
+const GAME = /github\.io$/.test(location.hostname) ? new URL('./', location.href).href : PAGES;
 let chosen = new Set(UNITS.map(u => u[0]));
 try{ const s = JSON.parse(localStorage.getItem('cj-teacher-units')||'null'); if(Array.isArray(s) && s.length) chosen = new Set(s); }catch(e){}
 
