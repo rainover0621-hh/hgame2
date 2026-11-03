@@ -90,6 +90,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
         <label><input type="radio" name="rec" id="recMine" value="mine"> 내 구글 시트로 받기</label>
         <input type="url" id="recUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
         <p class="note" id="recMsg">내 시트를 만드는 방법: <a href="https://github.com/rainover0621-hh/hgame2/blob/main/docs/기록-저장-설정.md" target="_blank" rel="noopener">학생 기록 받기 설정</a> (5분)</p>
+        <p class="note" id="qInfo" hidden></p>
         <label><input type="radio" name="rec" id="recOff" value="off"> 기록 받지 않기</label>
         <label><input type="radio" name="rec" id="recDefault" value="default"> 기본 시트 (이 게임을 만든 선생님의 시트)</label>
       </div>
@@ -127,7 +128,8 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
 
 <script src="assets/lib/qrcode.js"></script>
 <script>
-const UNITS = [["1","모양을 본뜨고, 기호로 나타내고",5],["2","뜻끼리 뭉치고, 뜻과 소리를 합하고",6],["3","앞을 먼저, 뒤는 나중에",13],["4","뒤를 먼저, 앞은 나중에",11],["5","숫자에 담긴 의미",10],["6","속담이 네 글자 속으로",6],["7","깊은 사연을 담아",8],["8","말과 행동은 진실하고 품위 있게",3]];
+const BASE_UNITS = [["1","모양을 본뜨고, 기호로 나타내고",5],["2","뜻끼리 뭉치고, 뜻과 소리를 합하고",6],["3","앞을 먼저, 뒤는 나중에",13],["4","뒤를 먼저, 앞은 나중에",11],["5","숫자에 담긴 의미",10],["6","속담이 네 글자 속으로",6],["7","깊은 사연을 담아",8],["8","말과 행동은 진실하고 품위 있게",3]];
+let UNITS = BASE_UNITS;   // 내 시트에 문제가 있으면 그 과들로 바뀜
 const $ = id => document.getElementById(id);
 // 학생용 게임 주소: GitHub Pages에서 열면 같은 폴더, 그 밖(claude.ai 등)에서 열면 공개 주소
 const PAGES = 'https://rainover0621-hh.github.io/hgame2/';
@@ -135,14 +137,29 @@ const GAME = /github\.io$/.test(location.hostname) ? new URL('./', location.href
 let chosen = new Set(UNITS.map(u => u[0]));
 try{ const s = JSON.parse(localStorage.getItem('cj-teacher-units')||'null'); if(Array.isArray(s) && s.length) chosen = new Set(s); }catch(e){}
 
-UNITS.forEach(([u, name, n]) => {
-  const l = document.createElement('label');
-  l.innerHTML = `<input type="checkbox" id="u${u}" value="${u}"><b>${u}과</b><span></span><em>낱말 ${n}</em>`;
-  l.querySelector('span').textContent = name;
-  l.querySelector('input').checked = chosen.has(u);
-  l.querySelector('input').onchange = e => { e.target.checked ? chosen.add(u) : chosen.delete(u); render(); };
-  $('units').appendChild(l);
-});
+function drawUnits(){
+  $('units').innerHTML = '';
+  UNITS.forEach(([u, name, n]) => {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox" value=""><b></b><span></span><em></em>`;
+    const cb = l.querySelector('input'); cb.id = 'u' + u; cb.value = u;
+    l.querySelector('b').textContent = u + '과';
+    l.querySelector('span').textContent = name;
+    l.querySelector('em').textContent = `낱말 ${n}`;
+    cb.checked = chosen.has(u);
+    cb.onchange = e => { e.target.checked ? chosen.add(u) : chosen.delete(u); render(); };
+    $('units').appendChild(l);
+  });
+}
+function setUnits(list){   // list 가 비면 기본(교과서 1~8과)
+  const next = list && list.length ? list : BASE_UNITS;
+  if(JSON.stringify(next) === JSON.stringify(UNITS)) return;
+  UNITS = next;
+  const keep = [...chosen].filter(u => UNITS.some(x => x[0] === u));
+  chosen = new Set(keep.length ? keep : UNITS.map(x => x[0]));
+  drawUnits(); render();
+}
+drawUnits();
 $('all').onclick = () => { UNITS.forEach(([u]) => { chosen.add(u); $('u'+u).checked = true; }); render(); };
 $('none').onclick = () => { chosen.clear(); UNITS.forEach(([u]) => { $('u'+u).checked = false; }); render(); };
 
@@ -175,6 +192,7 @@ function render(){
   else if(rec === 'mine'){ line.textContent = typed ? '웹 앱 주소가 올바르지 않아요 (…/exec 로 끝나는 주소)' : '내 시트의 웹 앱 주소를 붙여 넣으세요'; line.className += ' warn'; }
   else if(rec === 'off') line.textContent = '기록: 받지 않습니다 (학생 기기 안에서만 남음)';
   else { line.textContent = '기록: 이 게임을 만든 선생님의 시트로 갑니다'; line.className += ' warn'; }
+  checkQuestions(rec === 'mine' ? okId : null);
   const us = UNITS.map(u => u[0]).filter(u => chosen.has(u));
   const url = link();
   $('url').textContent = url;
@@ -184,6 +202,34 @@ function render(){
   const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
   $('qr').innerHTML = qr.createSvgTag({cellSize:8, margin:0, scalable:true});
 }
+// 내 시트 '문제' 탭 확인 (문제가 있으면 그 문제로 출제)
+let qTimer = null, qFor = null;
+function checkQuestions(id){
+  const box = $('qInfo');
+  if(!id){ box.hidden = true; qFor = null; setUnits(null); return; }
+  if(id === qFor) return;
+  qFor = id; clearTimeout(qTimer);
+  box.hidden = false; box.textContent = '내 시트의 문제 탭을 확인하는 중…';
+  qTimer = setTimeout(() => {
+    fetch(`https://script.google.com/macros/s/${id}/exec?action=questions&t=${Date.now()}`)
+      .then(r => r.json())
+      .then(j => {
+        if(qFor !== id) return;
+        const n = j && j.count || 0, units = [...new Set((j.questions||[]).map(q => String(q.u).replace(/과$/,'')))];
+        box.innerHTML = '';
+        box.append(n ? `문제 탭: ${n}문제 (${units.map(u => u+'과').join(' · ')}) → 이 문제로 출제합니다. ` : '문제 탭이 비어 있어 기본 문제(교과서 1~8과)로 출제합니다. ');
+        const a = document.createElement('a'); a.href = `${PAGES}test.html?r=${id}`; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '내 문제로 테스트';
+        box.append(a);
+        if(n){
+          const words = {};
+          (j.questions||[]).forEach(q => { const u = String(q.u).replace(/과$/,'').trim() || '기타'; (words[u] = words[u] || new Set()).add(q.w || q.h || q.a); });
+          setUnits(units.map(u => [u || '기타', '내 시트의 문제', words[u || '기타'] ? words[u || '기타'].size : 0]));
+        } else setUnits(null);
+      })
+      .catch(() => { if(qFor === id) box.textContent = '문제 탭을 확인하지 못했어요. 웹 앱을 새 버전으로 배포했는지 확인해 주세요. (기본 문제로 출제)'; });
+  }, 500);
+}
+
 $('copy').onclick = () => {
   const url = link();
   navigator.clipboard.writeText(url).then(() => { $('toast').textContent = '주소를 복사했습니다.'; },

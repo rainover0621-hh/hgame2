@@ -957,17 +957,18 @@ addEventListener('keydown', unlockAudio, {once:true});
    TEACHER_MODE(테스트 페이지): 첫 화면에서 과를 직접 고를 수 있음 */
 const TEACHER_MODE = true;   // 테스트 페이지: 단원 직접 선택 · 학생 정보 없이 시작
 const URL_UNITS = (() => {
-  try{ const v = new URLSearchParams(location.search).get('u'); return v ? v.split(/[,\s]+/).filter(u => CATS.includes(u)) : []; }
+  try{ const v = new URLSearchParams(location.search).get('u'); return v ? v.split(/[,\s]+/).filter(Boolean) : []; }
   catch(e){ return []; }
 })();
-let selCats = new Set(URL_UNITS.length ? URL_UNITS : CATS);
+const unitsFromUrl = () => URL_UNITS.filter(u => CATS.includes(u));
+let selCats = new Set(unitsFromUrl().length ? unitsFromUrl() : CATS);
 if(TEACHER_MODE){
   try{ const s = JSON.parse(store.get('cj-units')||'null'); if(Array.isArray(s) && s.length) selCats = new Set(s.filter(c=>CATS.includes(c))); }catch(e){}
   if(!selCats.size) selCats = new Set(CATS);
 }
 function renderCats(){
   if(!TEACHER_MODE){
-    $('unitLabel').textContent = '출제 범위 · 선생님이 정한 단원';
+    $('unitLabel').textContent = `출제 범위 · 선생님이 정한 단원${typeof questionSource !== 'undefined' && questionSource.from === '선생님 시트' ? ` · 선생님 문제 ${questionSource.count}개` : ''}`;
     $('cats').innerHTML = [...selCats].map(u => `<span class="unitchip">${u}과</span>`).join('');
     return;
   }
@@ -998,6 +999,7 @@ showBest();
    · 둘 다 없으면 RECORD_URL_DEFAULT (이 게임을 만든 선생님의 시트) */
 const RECORD_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbxq0BWex7fup_vQ2LBc3RKr41nC7Q_xBUd5QijuNxgPvZfjq4axgn31R5DtgDfdXjygzg/exec';
 const RECORD_URL = '';   // 테스트 페이지는 기록을 보내지 않음
+const QUESTION_URL = pickRecordUrl(RECORD_URL_DEFAULT);   // 문제를 불러올 시트 (테스트 페이지도 주소의 r= 시트 문제로 미리 볼 수 있게 따로 둠)
 function pickRecordUrl(fallback){
   try{
     const r = (new URLSearchParams(location.search).get('r') || '').trim();
@@ -1055,6 +1057,49 @@ function submitRecord(won, title){
     .catch(() => { queueRecord(rec); line.textContent = '인터넷이 끊겨 기록을 보내지 못했어요. 다음에 접속하면 자동으로 다시 보내요.'; });
 }
 flushPending();
+
+/* ---------- 선생님 시트의 '문제' 탭에서 문제 불러오기 ----------
+   시트에 문제가 있으면 그 문제로 출제, 없거나 못 불러오면 이 파일에 들어 있는 기본 문제(교과서 1~8과) */
+var questionSource = {from:'기본', count:QUESTIONS.length};   // var: 위쪽 renderCats()가 먼저 불려도 안전
+const BUILTIN_Q = QUESTIONS.slice(), BUILTIN_CATS = CATS.slice();
+function useSheetQuestions(list){
+  const conv = list.map((r, i) => {
+    const t = ['독음','뜻','어려움'].includes(r.t) ? r.t : /독음/.test(r.q) ? '독음' : /뜻/.test(r.q) ? '뜻' : '어려움';
+    return {u: String(r.u||'').replace(/과$/,'').trim() || '기타', c: r.c || '문제', d: Math.min(3, Math.max(1, Math.round(Number(r.d)) || 1)),
+      q: r.q, h: r.h || '', o: [r.a, ...(r.x||[])].slice(0,4), e: r.e || '', t, w: r.w || r.h || r.a || ('q'+i)};
+  }).filter(q => q.q && q.o.length >= 2);
+  if(!conv.length) return false;
+  QUESTIONS.length = 0; conv.forEach(q => QUESTIONS.push(q));
+  CATS.length = 0; [...new Set(QUESTIONS.map(q => q.u))].forEach(u => CATS.push(u));
+  selCats = new Set(unitsFromUrl().length ? unitsFromUrl() : CATS);
+  questionSource.from = '선생님 시트'; questionSource.count = QUESTIONS.length;
+  renderCats();
+  return true;
+}
+function loadSheetQuestions(){
+  if(!QUESTION_URL) return;
+  const key = 'cj-q:' + QUESTION_URL;
+  try{ const c = JSON.parse(store.get(key)||'null'); if(c && Array.isArray(c.questions)) useSheetQuestions(c.questions); }catch(e){}   // 지난번에 받은 문제로 먼저
+  const btn = $('startBtn'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = '문제 불러오는 중…';
+  const ctl = 'AbortController' in window ? new AbortController() : null;
+  const timer = setTimeout(() => ctl && ctl.abort(), 7000);
+  fetch(`${QUESTION_URL}?action=questions&t=${Date.now()}`, ctl ? {signal:ctl.signal} : {})
+    .then(r => r.json())
+    .then(j => {
+      if(j && Array.isArray(j.questions) && j.questions.length && useSheetQuestions(j.questions)) store.set(key, JSON.stringify({questions:j.questions}));
+      else if(j && j.count === 0){   // 시트 문제를 비우면 기본 문제로 돌아감
+        store.set(key, 'null');
+        if(questionSource.from !== '기본'){
+          QUESTIONS.length = 0; BUILTIN_Q.forEach(q => QUESTIONS.push(q)); CATS.length = 0; BUILTIN_CATS.forEach(u => CATS.push(u));
+          selCats = new Set(unitsFromUrl().length ? unitsFromUrl() : CATS); questionSource.from = '기본'; questionSource.count = QUESTIONS.length;
+        }
+      }
+    })
+    .catch(() => {})
+    .finally(() => { clearTimeout(timer); btn.disabled = false; btn.textContent = label; renderCats(); });
+}
+loadSheetQuestions();
 
 /* ---------- 오늘의 순위 · 내 기록 ----------
    선생님 시트(RECORD_URL)가 연결되어 있으면 오늘 전체 순위를 불러오고(학생별 최고 점수, 이름 가운데는 *),
