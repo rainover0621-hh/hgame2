@@ -10,7 +10,19 @@ const RECORD_HEAD = ['받은 시각','학년','반','번호','이름','결과','
 const WRONG_HEAD = ['받은 시각','학년','반','번호','이름','틀린 문제'];
 const QUESTION_HEAD = ['과','분류','난이도(1~3)','질문','크게 보일 글자','정답','오답1','오답2','오답3','해설','유형(독음/뜻/어려움)','낱말'];
 
+// ▶ 편집기에서 이 함수(시트_준비)를 골라 '실행'하세요. 필요한 시트(기록 · 오답 · 요약 · 명렬 · 문제 · 많이 틀린 문제)를 만듭니다.
+//   이미 있는 시트는 건드리지 않으므로 여러 번 실행해도 괜찮습니다.
+function 시트_준비() {
+  setup_(SpreadsheetApp.getActiveSpreadsheet());
+  Logger.log('준비 완료: 시트 아래쪽 탭을 확인하세요.');
+}
+
+// 학생 게임이 기록을 보낼 때 쓰는 함수 (편집기에서 직접 실행하지 마세요)
 function doPost(e) {
+  if (!e || !e.postData) {
+    Logger.log('doPost는 게임이 기록을 보낼 때 쓰는 함수입니다. 위쪽 함수 목록에서 「시트_준비」를 골라 실행하세요.');
+    return ContentService.createTextOutput('no data');
+  }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -166,7 +178,3 @@ function setup_(ss) {
   }
 }
 
-// 편집기에서 한 번 실행하면 필요한 시트(기록 · 오답 · 요약 · 명렬 · 문제 · 많이 틀린 문제)를 만들어 둡니다.
-function 시트_준비() {
-  setup_(SpreadsheetApp.getActiveSpreadsheet());
-}
