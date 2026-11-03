@@ -28,6 +28,13 @@ header p{margin:0;color:var(--muted);max-width:62ch}
 @media (max-width:760px){.grid{grid-template-columns:1fr}}
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;min-width:0}
 h2{margin:0;font-size:17px;font-weight:700}
+.recopt{display:grid;gap:8px}
+.recopt label{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
+.recopt input[type=radio]{accent-color:var(--jade);width:16px;height:16px}
+.recopt input[type=url]{font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;margin-left:24px}
+.recopt input[type=url].bad{border-color:var(--vermilion)}
+.rec{font-size:13px;font-weight:700;color:var(--jade)}
+.rec.warn{color:var(--vermilion)}
 .units{display:grid;gap:6px}
 .units label{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid var(--line);cursor:pointer;min-width:0}
 .units label:has(input:checked){border-color:var(--jade);background:color-mix(in srgb,var(--jade) 10%,transparent)}
@@ -78,6 +85,14 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
         <button type="button" id="none">전체 해제</button>
       </div>
       <p class="note">한 판은 19문제입니다. 고른 단원의 낱말이 19개보다 적으면 그만큼 짧은 판이 됩니다.</p>
+      <h2>학생 기록 받을 곳</h2>
+      <div class="recopt">
+        <label><input type="radio" name="rec" id="recMine" value="mine"> 내 구글 시트로 받기</label>
+        <input type="url" id="recUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
+        <p class="note" id="recMsg">내 시트를 만드는 방법: <a href="https://github.com/rainover0621-hh/hgame2/blob/main/docs/기록-저장-설정.md" target="_blank" rel="noopener">학생 기록 받기 설정</a> (5분)</p>
+        <label><input type="radio" name="rec" id="recOff" value="off"> 기록 받지 않기</label>
+        <label><input type="radio" name="rec" id="recDefault" value="default"> 기본 시트 (이 게임을 만든 선생님의 시트)</label>
+      </div>
       <h2>다른 페이지</h2>
       <div class="row">
         <a class="btn" href="test.html" target="_blank" rel="noopener">테스트 페이지 (단원·대장 바로 시작)</a>
@@ -92,6 +107,7 @@ button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid va
         <div class="title">한문 출정기</div>
         <div id="qr" role="img" aria-label="학생용 게임 주소 QR 코드"></div>
         <div class="scope" id="scope"></div>
+        <div class="rec noprint" id="recLine"></div>
         <div class="url" id="url"></div>
         <ol class="how">
           <li>휴대전화 카메라로 QR을 비추세요.</li>
@@ -128,12 +144,35 @@ UNITS.forEach(([u, name, n]) => {
 $('all').onclick = () => { UNITS.forEach(([u]) => { chosen.add(u); $('u'+u).checked = true; }); render(); };
 $('none').onclick = () => { chosen.clear(); UNITS.forEach(([u]) => { $('u'+u).checked = false; }); render(); };
 
+// 기록 받을 곳: 내 시트(웹 앱 ID) / 받지 않음(off) / 기본(만든 선생님 시트, 주소에 아무것도 안 붙임)
+let rec = 'default';
+try{ const r = JSON.parse(localStorage.getItem('cj-teacher-rec')||'null'); if(r){ rec = r.mode; $('recUrl').value = r.url || ''; } }catch(e){}
+$('rec'+rec[0].toUpperCase()+rec.slice(1)).checked = true;
+function sheetId(){
+  const v = $('recUrl').value.trim();
+  const m = v.match(/^https:\/\/script\.google\.com\/(?:a\/[\w.-]+\/)?macros\/s\/([\w-]+)\/exec\/?$/);
+  return m ? m[1] : (/^[\w-]{20,}$/.test(v) ? v : null);
+}
+document.querySelectorAll('input[name=rec]').forEach(r => r.onchange = () => { rec = r.value; render(); });
+$('recUrl').oninput = () => { rec = 'mine'; $('recMine').checked = true; render(); };
 function link(){
   const us = UNITS.map(u => u[0]).filter(u => chosen.has(u));
-  return us.length === UNITS.length || !us.length ? GAME : `${GAME}?u=${us.join(',')}`;
+  const q = [];
+  if(!(us.length === UNITS.length || !us.length)) q.push('u=' + us.join(','));
+  if(rec === 'mine' && sheetId()) q.push('r=' + sheetId());
+  if(rec === 'off') q.push('r=off');
+  return q.length ? `${GAME}?${q.join('&')}` : GAME;
 }
 function render(){
-  try{ localStorage.setItem('cj-teacher-units', JSON.stringify([...chosen])); }catch(e){}
+  try{ localStorage.setItem('cj-teacher-units', JSON.stringify([...chosen])); localStorage.setItem('cj-teacher-rec', JSON.stringify({mode:rec, url:$('recUrl').value.trim()})); }catch(e){}
+  const okId = sheetId(), typed = $('recUrl').value.trim();
+  $('recUrl').classList.toggle('bad', rec === 'mine' && !!typed && !okId);
+  const line = $('recLine');
+  line.className = 'rec noprint';
+  if(rec === 'mine' && okId) line.textContent = '기록: 내 구글 시트로 받습니다';
+  else if(rec === 'mine'){ line.textContent = typed ? '웹 앱 주소가 올바르지 않아요 (…/exec 로 끝나는 주소)' : '내 시트의 웹 앱 주소를 붙여 넣으세요'; line.className += ' warn'; }
+  else if(rec === 'off') line.textContent = '기록: 받지 않습니다 (학생 기기 안에서만 남음)';
+  else { line.textContent = '기록: 이 게임을 만든 선생님의 시트로 갑니다'; line.className += ' warn'; }
   const us = UNITS.map(u => u[0]).filter(u => chosen.has(u));
   const url = link();
   $('url').textContent = url;

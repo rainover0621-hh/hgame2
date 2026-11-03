@@ -992,9 +992,21 @@ function showBest(){
 showBest();
 
 /* ---------- 학생 정보 · 기록 전송 ----------
-   RECORD_URL 에 선생님의 Apps Script 웹 앱 주소(…/exec)를 넣으면,
-   게임이 끝날 때마다 결과가 선생님의 구글 시트에 한 줄씩 쌓입니다. 비워 두면 보내지 않습니다. */
+   게임이 끝날 때마다 결과를 선생님의 구글 시트(Apps Script 웹 앱)로 보냅니다.
+   · 주소에 ?r=웹앱ID (또는 r=웹앱 주소 전체)가 있으면 그 선생님의 시트로 → 다른 학교 선생님은 teacher.html에서 만든 링크·QR 사용
+   · ?r=off 이면 기록을 보내지 않음
+   · 둘 다 없으면 RECORD_URL_DEFAULT (이 게임을 만든 선생님의 시트) */
+const RECORD_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbxq0BWex7fup_vQ2LBc3RKr41nC7Q_xBUd5QijuNxgPvZfjq4axgn31R5DtgDfdXjygzg/exec';
 const RECORD_URL = '';   // 테스트 페이지는 기록을 보내지 않음
+function pickRecordUrl(fallback){
+  try{
+    const r = (new URLSearchParams(location.search).get('r') || '').trim();
+    if(r === 'off') return '';
+    if(/^[\w-]{20,}$/.test(r)) return `https://script.google.com/macros/s/${r}/exec`;
+    if(/^https:\/\/script\.google\.com\/(a\/[\w.-]+\/)?macros\/s\/[\w-]+\/exec$/.test(r)) return r;
+  }catch(e){}
+  return fallback;
+}
 const student = () => ({grade:$('stGrade').value, cls:$('stClass').value.trim(), num:$('stNum').value.trim(), name:$('stName').value.trim()});
 try{
   const s0 = JSON.parse(store.get('cj-student')||'null');
@@ -1010,21 +1022,20 @@ function checkStudent(){
   $('titleScreen').querySelector('.card').scrollTop = 0;
   return false;
 }
-function postRecord(rec){
-  return fetch(RECORD_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(rec)});
+function postRecord(rec, url){
+  return fetch(url || RECORD_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(rec)});
 }
 function flushPending(){
-  if(!RECORD_URL) return;
   let list = [];
   try{ list = JSON.parse(store.get('cj-pending')||'[]'); }catch(e){}
   if(!list.length) return;
   store.set('cj-pending', '[]');
-  list.forEach(rec => postRecord(rec).catch(() => queueRecord(rec)));
+  list.forEach(item => { const rec = item.rec || item, to = item.to || RECORD_URL; if(to) postRecord(rec, to).catch(() => queueRecord(rec, to)); });
 }
-function queueRecord(rec){
+function queueRecord(rec, to){
   let list = [];
   try{ list = JSON.parse(store.get('cj-pending')||'[]'); }catch(e){}
-  list.push(rec); store.set('cj-pending', JSON.stringify(list.slice(-30)));
+  list.push({rec, to: to || RECORD_URL}); store.set('cj-pending', JSON.stringify(list.slice(-30)));
 }
 function submitRecord(won, title){
   const line = $('sendLine'), s = student();
