@@ -17,6 +17,11 @@ function 시트_준비() {
   Logger.log('준비 완료: 시트 아래쪽 탭을 확인하세요.');
 }
 
+// ▶ 3학년 체크리스트: '명렬' 탭의 3학년 학생을 반 · 번호 순으로 모아 참여 · 완주를 체크합니다. (다른 학년은 숫자만 바꾼 함수를 쓰세요)
+function 체크리스트_3학년() { makeChecklist_(3); }
+function 체크리스트_2학년() { makeChecklist_(2); }
+function 체크리스트_1학년() { makeChecklist_(1); }
+
 // 학생 게임이 기록을 보낼 때 쓰는 함수 (편집기에서 직접 실행하지 마세요)
 function doPost(e) {
   if (!e || !e.postData) {
@@ -114,6 +119,42 @@ function num_(v) {
 function clean_(v) {
   const s = String(v == null ? '' : v).slice(0, 500);
   return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
+// 'N학년 체크리스트' 탭: 명렬(A~J)에서 그 학년만 골라 보여 주는 수식 탭. 기록이 쌓이면 자동으로 갱신됨
+function makeChecklist_(grade) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  setup_(ss);
+  const name = grade + '학년 체크리스트';
+  let sh = ss.getSheetByName(name);
+  if (sh) sh.clear(); else sh = ss.insertSheet(name);
+  const R = "'명렬'!";
+  sh.getRange('A1').setValue(grade + '학년 한문 출정기 체크리스트').setFontWeight('bold').setFontSize(14);
+  sh.getRange('A2').setFormula('="기준: "&TEXT(NOW(),"yyyy-mm-dd hh:mm")&"  ·  ✅ 참여/완주  ⬜ 아직"');
+  sh.getRange(3, 1, 1, 9).setValues([['반', '번호', '이름', '참여', '완주', '플레이 횟수', '최고 점수', '평균 정답률', '마지막 플레이']])
+    .setFontWeight('bold').setBackground('#f6f1e7');
+  // 명렬의 그 학년 학생을 반 · 번호 순으로
+  sh.getRange('A4').setFormula(
+    '=ARRAYFORMULA(IFERROR(SORT(FILTER({' + R + 'B2:B,' + R + 'C2:C,' + R + 'D2:D,' +
+    'IF(IF(ISNUMBER(' + R + 'E2:E),' + R + 'E2:E,0)>0,"✅","⬜"),IF(IF(ISNUMBER(' + R + 'F2:F),' + R + 'F2:F,0)>0,"✅","⬜"),' +
+    R + 'E2:E,' + R + 'G2:G,' + R + 'H2:H,' + R + 'J2:J},' +
+    R + 'A2:A=' + grade + ',' + R + 'D2:D<>""),1,TRUE,2,TRUE),"명렬 탭에 ' + grade + '학년 학생이 없습니다"))');
+  sh.getRange('H:H').setNumberFormat('0%');
+  sh.getRange('I:I').setNumberFormat('mm-dd hh:mm');
+  // 오른쪽: 반별 참여 · 완주 현황
+  sh.getRange(3, 11, 1, 6).setValues([['반', '인원', '참여', '완주', '참여율', '완주율']]).setFontWeight('bold').setBackground('#e6efe9');
+  sh.getRange('K4').setFormula('=IFERROR(SORT(UNIQUE(FILTER(' + R + 'B2:B,' + R + 'A2:A=' + grade + ',' + R + 'D2:D<>""))),"")');
+  const m = (body) => '=MAP(K4:K,LAMBDA(c,IF(c="","",' + body + ')))';
+  sh.getRange('L4').setFormula(m('COUNTIFS(' + R + 'A:A,' + grade + ',' + R + 'B:B,c,' + R + 'D:D,"<>")'));
+  sh.getRange('M4').setFormula(m('COUNTIFS(' + R + 'A:A,' + grade + ',' + R + 'B:B,c,' + R + 'D:D,"<>",' + R + 'E:E,">0")'));
+  sh.getRange('N4').setFormula(m('COUNTIFS(' + R + 'A:A,' + grade + ',' + R + 'B:B,c,' + R + 'D:D,"<>",' + R + 'F:F,">0")'));
+  sh.getRange('O4').setFormula('=MAP(L4:L,M4:M,LAMBDA(n,p,IF(n="","",IF(n=0,"",p/n))))');
+  sh.getRange('P4').setFormula('=MAP(L4:L,N4:N,LAMBDA(n,d,IF(n="","",IF(n=0,"",d/n))))');
+  sh.getRange('O:P').setNumberFormat('0%');
+  sh.setFrozenRows(3);
+  sh.setColumnWidths(1, 3, 60); sh.setColumnWidth(3, 90); sh.setColumnWidths(4, 2, 50); sh.setColumnWidth(10, 24);
+  ss.setActiveSheet(sh);
+  Logger.log(name + ' 탭을 만들었습니다.');
 }
 
 function setup_(ss) {
