@@ -43,10 +43,10 @@ body{
   --cq:1cqw;   /* 무대 너비의 1% (오래된 아이폰을 위해 JS가 px로 다시 넣음) */
   position:relative;container-type:size;overflow:hidden;
   border-radius:14px;box-shadow:0 0 0 1px #ffffff14,0 24px 70px #000a;
-  touch-action:none;user-select:none;-webkit-user-select:none;
+  user-select:none;-webkit-user-select:none;
   background:var(--night-2);
 }
-#game{position:absolute;inset:0;width:100%;height:100%;display:block}
+#game{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 #flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 40%,#d4553a77 100%);opacity:0;transition:opacity .35s}
 #flash.on{opacity:1;transition:none}
 
@@ -76,6 +76,7 @@ body{
 .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:calc(4*var(--cq));background:#070a10b8;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
 .card{
   position:relative;width:100%;max-height:100%;overflow:auto;box-sizing:border-box;
+  touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   background:var(--ivory);color:var(--ink);border-radius:calc(3*var(--cq));padding:calc(5.4*var(--cq)) calc(5*var(--cq)) calc(5*var(--cq));
   box-shadow:0 0 0 1px #ffffff40,0 calc(3*var(--cq)) calc(9*var(--cq)) #000b;
   font-size:calc(3.6*var(--cq));line-height:1.6;
@@ -984,7 +985,7 @@ showBest();
    · 주소에 ?r=웹앱ID (또는 r=웹앱 주소 전체)가 있으면 그 선생님의 시트로 → 다른 학교 선생님은 teacher.html에서 만든 링크·QR 사용
    · ?r=off 이면 기록을 보내지 않음
    · 둘 다 없으면 RECORD_URL_DEFAULT (이 게임을 만든 선생님의 시트) */
-const RECORD_URL_DEFAULT = '';   // 공유용: 여기에 내 Apps Script 웹 앱 주소(…/exec)를 넣으면 내 시트로 기록이 가고 '문제' 탭의 문제로 출제합니다
+const RECORD_URL_DEFAULT = '';
 const RECORD_URL = pickRecordUrl(RECORD_URL_DEFAULT);
 const QUESTION_URL = pickRecordUrl(RECORD_URL_DEFAULT);   // 문제를 불러올 시트 (테스트 페이지도 주소의 r= 시트 문제로 미리 볼 수 있게 따로 둠)
 function pickRecordUrl(fallback){
@@ -1089,7 +1090,7 @@ function loadSheetQuestions(){
 loadSheetQuestions();
 
 /* ---------- 오늘의 순위 · 내 기록 ----------
-   선생님 시트(RECORD_URL)가 연결되어 있으면 오늘 전체 순위를 불러오고(학생별 최고 점수, 이름 가운데는 *),
+   선생님 시트(RECORD_URL)가 연결되어 있으면 오늘 전체 순위를 불러오고(학생별 최고 점수, 이름 그대로),
    연결 전이거나 인터넷이 안 되면 이 기기에서 오늘 한 기록으로 순위를 보여 줌 */
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const maskName = n => n.length <= 1 ? n : n.length === 2 ? n[0]+'*' : n[0] + '*'.repeat(n.length-2) + n[n.length-1];
@@ -1102,7 +1103,7 @@ function saveLocal(won, title){
   store.set('cj-history', JSON.stringify(list.slice(-80)));
 }
 let rankMode = 'mine', rankData = null, rankFrom = null, rankSrc = 'local';
-const isMe = (r, s) => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && r.name === maskName(s.name);
+const isMe = (r, s) => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && (r.name === s.name || r.name === maskName(s.name));
 const myLocal = s => loadLocal().filter(r => String(r.grade) === String(s.grade) && String(r.cls) === String(s.cls) && String(r.num) === String(s.num) && r.name === s.name);
 function openRank(){
   rankFrom = !$('overScreen').hidden ? 'overScreen' : 'titleScreen';
@@ -1134,7 +1135,7 @@ function localRank(){
   const best = {};
   loadLocal().filter(r => r.d === todayStr()).forEach(r => {
     const k = [r.grade,r.cls,r.num,r.name].join('|');
-    const b = best[k] || (best[k] = {grade:r.grade, cls:r.cls, num:r.num, name:maskName(r.name||''), score:-1, result:'', plays:0, done:0});
+    const b = best[k] || (best[k] = {grade:r.grade, cls:r.cls, num:r.num, name:r.name||'', score:-1, result:'', plays:0, done:0});
     b.plays++; if(r.done) b.done = 1;
     if(r.score > b.score){ b.score = r.score; b.result = r.result; }
   });

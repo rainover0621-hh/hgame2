@@ -66,7 +66,7 @@ function doGet(e) {
   return ContentService.createTextOutput('한문 출정기 기록을 받을 준비가 되었습니다.');
 }
 
-// 오늘 기록만 모아 학생별 최고 점수 순으로. 이름은 가운데 글자를 *로 가려서 보냄
+// 오늘 기록만 모아 학생별 최고 점수 순으로 (이름 그대로)
 function todayRank_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tz = ss.getSpreadsheetTimeZone();
@@ -81,7 +81,7 @@ function todayRank_() {
     plays++;
     const key = [r[1], r[2], r[3], r[4]].join('|');
     const b = best[key] || (best[key] = {grade: String(r[1]), cls: String(r[2]), num: String(r[3]),
-      name: mask_(String(r[4])), score: -1, result: '', done: 0, plays: 0});
+      name: String(r[4]), score: -1, result: '', done: 0, plays: 0});
     b.plays++;
     if (Number(r[6]) === 1) b.done = 1;
     const score = Number(r[7]) || 0;
@@ -101,12 +101,6 @@ function questions_() {
     a: r[5].trim(), x: [r[6], r[7], r[8]].map(v => v.trim()).filter(v => v), e: r[9].trim(), t: r[10].trim(), w: r[11].trim()
   })).filter(q => q.q && q.a && q.x.length);
   return {count: qs.length, questions: qs};
-}
-
-function mask_(n) {
-  if (n.length <= 1) return n;
-  if (n.length === 2) return n[0] + '*';
-  return n[0] + '*'.repeat(n.length - 2) + n[n.length - 1];
 }
 
 // 학년·반·번호는 숫자로 저장 (명렬과 맞춰 보기 위해)
