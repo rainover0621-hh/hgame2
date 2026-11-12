@@ -22,6 +22,15 @@ function 체크리스트_3학년() { makeChecklist_(3); }
 function 체크리스트_2학년() { makeChecklist_(2); }
 function 체크리스트_1학년() { makeChecklist_(1); }
 
+// ▶ 정렬 보기: '명렬' 탭은 수식으로 채워져서 직접 정렬이 안 됩니다. 이 함수를 실행하면 '정렬 보기' 탭이 생기고,
+//   위쪽 칸에서 정렬 기준 · 순서(내림차순/오름차순) · 학년 · 반을 고르면 바로 그 순서로 보여 줍니다.
+function 정렬_보기() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  setup_(ss);
+  makeSortView_(ss);
+  ss.setActiveSheet(ss.getSheetByName('정렬 보기'));
+}
+
 // 학생 게임이 기록을 보낼 때 쓰는 함수 (편집기에서 직접 실행하지 마세요)
 function doPost(e) {
   if (!e || !e.postData) {
@@ -151,6 +160,39 @@ function makeChecklist_(grade) {
   Logger.log(name + ' 탭을 만들었습니다.');
 }
 
+// '정렬 보기' 탭: 명렬(A~J)을 고른 기준으로 정렬해 보여 주는 수식 탭
+function makeSortView_(ss) {
+  const name = '정렬 보기';
+  let sh = ss.getSheetByName(name);
+  if (sh) sh.clear(); else sh = ss.insertSheet(name);
+  const COLS = ['학년', '반', '번호', '이름', '플레이 횟수', '완주 횟수', '최고 점수', '평균 정답률', '오늘 최고 점수', '마지막 플레이'];
+  const list = (vals) => SpreadsheetApp.newDataValidation().requireValueInList(vals, true).setAllowInvalid(false).build();
+  const classes = ['전체']; for (let i = 1; i <= 15; i++) classes.push(String(i));
+  sh.getRange('A1:H1').setValues([['정렬 기준', '최고 점수', '순서', '내림차순', '학년', '전체', '반', '전체']]);
+  sh.getRange('B1').setDataValidation(list(COLS));
+  sh.getRange('D1').setDataValidation(list(['내림차순', '오름차순']));
+  sh.getRange('F1').setDataValidation(list(['전체', '1', '2', '3', '4', '5', '6']));
+  sh.getRange('H1').setDataValidation(list(classes));
+  [1, 3, 5, 7].forEach(c => sh.getRange(1, c).setFontWeight('bold').setHorizontalAlignment('right'));
+  [2, 4, 6, 8].forEach(c => sh.getRange(1, c).setBackground('#fff7e3').setFontWeight('bold'));
+  sh.getRange('A2').setValue('▲ 노란 칸을 눌러 고르면 아래 표가 바로 바뀝니다. (이 탭은 보기 전용 · 학생 명단은 명렬 탭에 입력)').setFontColor('#777777');
+  sh.getRange(3, 1, 1, 10).setValues([COLS]).setFontWeight('bold').setBackground('#f6f1e7');
+  const R = "'명렬'!";
+  sh.getRange('A4').setFormula(
+    '=IFERROR(LET(asc,$D$1="오름차순",' +
+    'd,FILTER(' + R + 'A2:J,' + R + 'D2:D<>"",' +
+      '(($F$1="전체")+(TO_TEXT(' + R + 'A2:A)=TO_TEXT($F$1)))>0,' +
+      '(($H$1="전체")+(TO_TEXT(' + R + 'B2:B)=TO_TEXT($H$1)))>0),' +
+    'k,CHOOSECOLS(d,MATCH($B$1,' + R + 'A1:J1,0)),' +
+    'key,MAP(k,LAMBDA(x,IF(OR(x="",x="-"),IF(asc,9E+99,-9E+99),x))),' +
+    'SORT(d,key,asc,CHOOSECOLS(d,1),TRUE,CHOOSECOLS(d,2),TRUE,CHOOSECOLS(d,3),TRUE)),' +
+    '"조건에 맞는 학생이 없습니다 (명렬 탭에 명단이 있는지 확인)")');
+  sh.getRange('H:H').setNumberFormat('0%');
+  sh.getRange('J:J').setNumberFormat('mm-dd hh:mm');
+  sh.setFrozenRows(3);
+  sh.setColumnWidths(1, 3, 70); sh.setColumnWidth(4, 90);
+}
+
 function setup_(ss) {
   if (!ss.getSheetByName('기록')) {
     const sh = ss.insertSheet('기록', 0);
@@ -203,6 +245,7 @@ function setup_(ss) {
     sh.setFrozenRows(1);
     sh.setColumnWidth(4, 260); sh.setColumnWidth(6, 200); sh.setColumnWidths(7, 3, 160); sh.setColumnWidth(10, 280);
   }
+  if (!ss.getSheetByName('정렬 보기') && ss.getSheetByName('명렬')) makeSortView_(ss);
   if (!ss.getSheetByName('많이 틀린 문제')) {
     const sh = ss.insertSheet('많이 틀린 문제');
     sh.getRange('A1').setFormula(
